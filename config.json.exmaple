@@ -1,0 +1,95 @@
+{
+  "log": {
+    "loglevel": "info",
+    "error": "/var/log/xray/error.log",
+    "access": "/var/log/xray/access.log"
+  },
+  "dns": {
+    "servers": [
+      {
+        "address": "223.5.5.5",
+        "domains": ["geosite:cn"],
+        "expectIPs": ["geoip:cn"]
+      },
+      {
+        "address": "8.8.8.8",
+        "domains": ["geosite:geolocation-!cn"]
+      },
+      "1.1.1.1",
+      "localhost"
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "all-in",
+      "port": 12345,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "network": "tcp,udp",
+        "followRedirect": true
+      },
+      "streamSettings": {
+        "sockopt": {
+          "tproxy": "tproxy"
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "vless",
+      "tag": "proxy",
+      "settings": {
+        // ...
+        "sockopt": {
+          "mark": 2
+        }
+      }
+    },
+    {
+      "protocol": "freedom",
+      "tag": "direct",
+      "streamSettings": {
+        "sockopt": {
+          "mark": 2
+        }
+      }
+    },
+    {
+      "protocol": "blackhole",
+      "tag": "blocked"
+    }
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "rules": [
+      {
+        "type": "field",
+        "ip": [
+          "127.0.0.0/8",
+          "10.0.0.0/8",
+          "172.16.0.0/12",
+          "192.168.0.0/16",
+          "169.254.0.0/16"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "type": "field",
+        "domain": ["geosite:cn"],
+        "outboundTag": "direct"
+      },
+      {
+        "type": "field",
+        "ip": ["geoip:cn"],
+        "outboundTag": "direct"
+      },
+      {
+        "type": "field",
+        "network": "tcp,udp",
+        "outboundTag": "proxy"
+      }
+    ]
+  }
+}
+// vim: ft=jsonc

@@ -1,0 +1,165 @@
+#!/usr/sbin/nft -f
+
+# =============================================================================
+# Xray Transparent Proxy NFTables Configuration
+# =============================================================================
+# This configuration sets up transparent proxy rules for Xray using nftables
+# It handles both IPv4 and IPv6 traffic redirection to the Xray proxy
+# 
+# Version: 1.1 (Fixed for proper tproxy operation)
+# Compatible with: nftables 0.9.3+, Xray-core 1.4+
+# =============================================================================
+
+# Clear all existing rules to start with a clean state
+flush ruleset
+
+# =============================================================================
+# NETWORK CONSTANTS AND DEFINITIONS
+# =============================================================================
+
+# Define IPv4 reserved/private address ranges that should not be proxied
+# These include RFC 1918 private networks, localhost, multicast, etc.
+define RESERVED_IP = {
+    10.0.0.0/8,          # Private network (Class A)
+    100.64.0.0/10,       # Carrier-grade NAT (RFC 6598)
+    127.0.0.0/8,         # Localhost/loopback
+    169.254.0.0/16,      # Link-local addresses (APIPA)
+    172.16.0.0/12,       # Private network (Class B)
+    192.0.0.0/24,        # IETF Protocol Assignments
+    192.0.2.0/24,        # TEST-NET-1 (RFC 3330)
+    192.88.99.0/24,      # IPv4 to IPv6 relay (RFC 3068)
+    192.168.0.0/16,      # Private network (Class C)
+    198.18.0.0/15,       # Network benchmark tests (RFC 2544)
+    198.51.100.0/24,     # TEST-NET-2 (RFC 3330)
+    203.0.113.0/24,      # TEST-NET-3 (RFC 3330)
+    224.0.0.0/4,         # Multicast (Class D)
+    240.0.0.0/4,         # Reserved (Class E)
+    255.255.255.255/32   # Broadcast
+}
+
+# Define IPv6 reserved/private address ranges that should not be proxied
+# These include localhost, link-local, unique local, multicast, etc.
+define RESERVED_IP6 = {
+    ::1/128,             # IPv6 localhost
+    ::ffff:0:0/96,       # IPv4-mapped IPv6 addresses
+    64:ff9b::/96,        # Well-known prefix for IPv4/IPv6 translation
+    64:ff9b:1::/48,      # IPv4-IPv6 translation (RFC 8215)
+    100::/64,            # Discard-only address block (RFC 6666)
+    2001::/23,           # IETF protocol assignments (expanded range)
+    2001:10::/28,        # ORCHID (Overlay Routable Cryptographic Hash Identifiers)
+    2001:20::/28,        # ORCHIDv2 (RFC 7343)
+    2001:db8::/32,       # Documentation prefix (RFC 3849)
+    2002::/16,           # 6to4 tunneling (RFC 3056)
+    fc00::/7,            # Unique local addresses (RFC 4193)
+    fe80::/10,           # Link-local addresses
+    ff00::/8             # Multicast
+}
+
+# Define packet marking values for traffic control
+define XRAY_MARK = 1      # Mark for packets that should be proxied
+define BYPASS_MARK = 2    # Mark for packets that should bypass proxy
+
+# Define Xray proxy listening addresses and ports
+define XRAY_TPROXY_PORT = 12345
+
+# =============================================================================
+# IPv4 TRANSPARENT PROXY TABLE
+# =============================================================================
+
+table ip xray_v4 {
+    
+    # -------------------------------------------------------------------------
+    # PREROUTING CHAIN - Handle incoming packets before routing decision
+    # CRITICAL: Must use 'filter' type with 'mangle' priority for tproxy!
+    # -------------------------------------------------------------------------
+    chain prerouting {
+        type filter hook prerouting priority mangle; policy accept;
+        
+        # Skip reserved/private addresses (no need to proxy local traffic)
+        ip daddr $RESERVED_IP return
+        
+        # Skip packets already marked for bypass (prevent infinite loops)
+        meta mark $BYPASS_MARK return
+        
+        # Redirect TCP traffic to Xray transparent proxy
+        ip protocol tcp tproxy to 127.0.0.1:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter comment "tproxy-tcp-v4"
+        
+        # Redirect UDP traffic to Xray transparent proxy
+        ip protocol udp tproxy to 127.0.0.1:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter comment "tproxy-udp-v4"
+    }
+    
+    # -------------------------------------------------------------------------
+    # OUTPUT CHAIN - Handle locally generated packets
+    # CRITICAL: Must use 'route' type with 'mangle' priority for proper marking!
+    # -------------------------------------------------------------------------
+    chain output {
+        type route hook output priority mangle; policy accept;
+        
+        # Skip reserved/private addresses (no need to proxy local traffic)
+        ip daddr $RESERVED_IP return
+        
+        # Skip packets already marked for bypass (prevent infinite loops)
+        meta mark $BYPASS_MARK return
+        
+        # Optional: Skip traffic from specific user (uncomment if Xray runs as dedicated user)
+        # This prevents Xray's own traffic from being redirected back to itself
+        # meta skuid "xray-user" return
+        
+        # Mark outgoing TCP traffic for routing through Xray
+        ip protocol tcp meta mark set $XRAY_MARK counter comment "mark-tcp-v4"
+        
+        # Mark outgoing UDP traffic for routing through Xray  
+        ip protocol udp meta mark set $XRAY_MARK counter comment "mark-udv4"
+    }
+}
+
+# =============================================================================
+# IPv6 TRANSPARENT PROXY TABLE
+# =============================================================================
+
+table ip6 xray_v6 {
+    
+    # -------------------------------------------------------------------------
+    # PREROUTING CHAIN - Handle incoming IPv6 packets before routing decision
+    # CRITICAL: Must use 'filter' type with 'mangle' priority for tproxy!
+    # -------------------------------------------------------------------------
+    chain prerouting {
+        type filter hook prerouting priority mangle; policy accept;
+        
+        # Skip reserved/private IPv6 addresses (no need to proxy local traffic)
+        ip6 daddr $RESERVED_IP6 return
+        
+        # Skip packets already marked for bypass (prevent infinite loops)
+        meta mark $BYPASS_MARK return
+        
+        # Redirect IPv6 TCP traffic to Xray transparent proxy
+        ip6 nexthdr tcp tproxy to [::1]:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter comment "tproxy-tcp-v6"
+        
+        # Redirect IPv6 UDP traffic to Xray transparent proxy
+        ip6 nexthdr udp tproxy to [::1]:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter comment "tproxy-udp-v6"
+    }
+    
+    # -------------------------------------------------------------------------
+    # OUTPUT CHAIN - Handle locally generated IPv6 packets
+    # CRITICAL: Must use 'route' type with 'mangle' priority for proper marking!
+    # -------------------------------------------------------------------------
+    chain output {
+        type route hook output priority mangle; policy accept;
+        
+        # Skip reserved/private IPv6 addresses (no need to proxy local traffic)
+        ip6 daddr $RESERVED_IP6 return
+        
+        # Skip packets already marked for bypass (prevent infinite loops)
+        meta mark $BYPASS_MARK return
+        
+        # Optional: Skip traffic from specific user (uncomment if Xray runs as dedicated user)
+        # This prevents Xray's own traffic from being redirected back to itself
+        # meta skuid "xray-user" return
+        
+        # Mark outgoing IPv6 TCP traffic for routing through Xray
+        ip6 nexthdr tcp meta mark set $XRAY_MARK counter comment "mark-tcp-v6"
+        
+        # Mark outgoing IPv6 UDP traffic for routing through Xray
+        ip6 nexthdr udp meta mark set $XRAY_MARK counter comment "mark-udp-v6"
+    }
+}
