@@ -47,10 +47,15 @@ systemctl start xray
 ## Operating Mechanism
 
 Step 1 - Traffic Hijacking: When your app tries to connect to google.com, the Linux firewall catches the packet before it leaves your computer and puts a special "mark" on it.
+
 Step 2 - Routing Trick: A special routing rule says "any packet with this mark should be delivered to localhost instead of the real internet." This fools the kernel into thinking google.com is actually a service running on your own computer.
+
 Step 3 - Proxy Intercept: Xray proxy is listening on localhost and receives the packet. Importantly, it can still see that the original destination was google.com (not localhost), so it knows where the app really wanted to go.
+
 Step 4 - Smart Forwarding: Xray looks at the destination and decides: should this go through a VPN tunnel, or directly to the internet? Then it forwards the traffic accordingly and sends the response back to your app.
+
 The Magic: Your application thinks it connected directly to google.com and has no idea a proxy was involved. Meanwhile, Xray secretly routed the traffic through whatever path you configured (VPN, direct, blocked, etc).
+
 Key Insight: By combining packet marking with custom routing rules, we can intercept traffic at the kernel level while preserving all the original connection information, making the proxy completely invisible to applications.
 
 ### Outbound Traffic Flow
