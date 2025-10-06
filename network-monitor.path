@@ -1,0 +1,9 @@
+[Unit]
+Description=Monitor network interface changes
+
+[Path]
+PathModified=/sys/class/net/wlan0/operstate
+Unit=your-service.service
+
+[Install]
+WantedBy=multi-user.target

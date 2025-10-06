@@ -13,36 +13,38 @@ To apply this project's solution, please make sure the following related utils a
 
 ## How to Apply the Project
 
-Allow system network forwarding:
+1. Allow system network forwarding:
+    ```sh
+    sudo ./ip-forward-config.sh
+    ```
 
-```sh
-sudo ./ip-forward-config.sh
-```
+2. Config NFTables and Routing:
+    ```sh
+    sudo bash -c '[ ! -d "/etc/nftables" ] && mkdir -p "/etc/nftables" && cp ./xray-tproxy.nft /etc/nftables/xray-tproxy.nft'
+    sudo cp ./xray-tproxy.nft 
+    sudo cp ./xray-tproxy-network.service /etc/systemd/system/xray-tproxy-network.service
+    ```
+3. Config Xray Service:
+    You can use the service from the package, and I still provide the template for refering to prevent any unexpected thing.
 
-Config NFTables and Routing:
+4. Config Xray, please refer to the template to create a usable xray configuration file:
+    ```sh
+    cp ./config.json.exmaple ./config.json && $EDITOR ./config.json
+    # Optinal: test your config files
+    # xray -test -config ./config.json
+    ```
 
-```sh
-sudo bash -c '[ ! -d "/etc/nftables" ] && mkdir -p "/etc/nftables" && cp ./xray-tproxy.nft /etc/nftables/xray-tproxy.nft'
-sudo cp ./xray-tproxy.nft 
-sudo cp ./xray-tproxy-network.service /etc/systemd/system/xray-tproxy-network.service
-```
+5. Start your xray, xray-tproxy-network services:
+    ```sh
+    sudo systemctl enable --now xray xray-tproxy-network
+    ```
 
-Please refer to the template to create a usable xray configuration file:
-
-```sh
-cp ./config.json.exmaple ./config.json && $EDITOR ./config.json
-# Optinal: test your config files
-# xray -test -config ./config.json
-```
-
-Start your xray, no matter using systemd or mannual, please specified the above config for xray.
-
-Follow the conventions, xray installed via distro package manager includes the service which set `ExecStart=/usr/bin/xray run -confdir /etc/xray/`. In this case, I can start xray using the following method:
-
-```sh
-sudo cp ./config.json /etc/xray/config.json
-systemctl start xray
-```
+6. (Optional) For better user experience:
+    Network card UP and Down will flush the NFTable fules, you need to restart the service to make it work, the following config can execute the operation automatically:
+    ```sh
+    sudo cp ./network-monitor.path /etc/systemd/system/network-monitor.path
+    sudo systemctl enable --now network-monitor.path
+    ```
 
 ## Operating Mechanism
 
