@@ -39,12 +39,33 @@ To apply this project's solution, please make sure the following related utils a
     sudo systemctl enable --now xray xray-tproxy-network
     ```
 
-6. (Optional) For better user experience:
-    Network card UP and Down will flush the NFTable fules, you need to restart the service to make it work, the following config can execute the operation automatically:
-    ```sh
-    sudo cp ./network-monitor.path /etc/systemd/system/network-monitor.path
-    sudo systemctl enable --now network-monitor.path
-    ```
+
+(Optional) For better user experience:
+
+Network card UP and Down will flush the NFTable fules, you need to restart the service to make it work, the following config can execute the operation automatically:
+
+```sh
+sudo cp ./network-monitor.path /etc/systemd/system/network-monitor.path
+sudo systemctl enable --now network-monitor.path
+```
+
+**But it’s unreliable after suspend or resume** because /sys/class/net/wlan0/operstate is recreated and the inotify watch is lost.
+
+So `udev` is more recommended:
+
+```sh
+sudo nano /etc/udev/rules.d/90-wlan-monitor.rules
+```
+
+```udev
+ACTION=="change", SUBSYSTEM=="net", KERNEL=="wlan0", RUN+="/usr/bin/systemctl start xray-tproxy-network.service"
+```
+
+```sh
+sudo udevadm control --reload-rules
+sudo udevadm trigger --subsystem-match=net
+```
+
 
 ## Operating Mechanism
 
