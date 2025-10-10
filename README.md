@@ -42,16 +42,18 @@ To apply this project's solution, please make sure the following related utils a
 
 (Optional) For better user experience:
 
-Network card UP and Down will flush the NFTable fules, you need to restart the service to make it work, the following config can execute the operation automatically:
+Disconnect and reconnect to wireless network:
+
+Network card UP and Down will flush the NFTable rules.
+
+You need to restart the service to make it work, the following config can execute the operation automatically:
 
 ```sh
 sudo cp ./network-monitor.path /etc/systemd/system/network-monitor.path
 sudo systemctl enable --now network-monitor.path
 ```
 
-**But it’s unreliable after suspend or resume** because /sys/class/net/wlan0/operstate is recreated and the inotify watch is lost.
-
-So `udev` is more recommended:
+Or `udev` is more recommended:
 
 ```sh
 sudo nano /etc/udev/rules.d/90-wlan-monitor.rules
@@ -66,6 +68,9 @@ sudo udevadm control --reload-rules
 sudo udevadm trigger --subsystem-match=net
 ```
 
+Suspend / Resume to wireless modules:
+
+**TODO, not found a good solution to prevent restart network service manually**
 
 ## Operating Mechanism
 

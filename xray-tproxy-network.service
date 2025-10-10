@@ -10,21 +10,21 @@ Type=oneshot
 RemainAfterExit=yes
 
 # Setup IPv4 routing rules
-ExecStartPre=/bin/bash -c 'ip rule show | grep -q "fwmark 0x1 lookup 100" || ip rule add fwmark 1 ta>
-ExecStartPre=/bin/bash -c 'ip route show table 100 | grep -q "local default" || ip route add local 0>
+ExecStartPre=/bin/bash -c 'ip rule show | grep -q "fwmark 0x1 lookup 100" || ip rule add fwmark 1 table 100'
+ExecStartPre=/bin/bash -c 'ip route show table 100 | grep -q "local default" || ip route add local 0.0.0.0/0 dev lo table 100'
 
 # Setup IPv6 routing rules
-ExecStartPre=/bin/bash -c 'ip -6 rule show | grep -q "fwmark 0x1 lookup 100" || ip -6 rule add fwmar>
-ExecStartPre=/bin/bash -c 'ip -6 route show table 100 | grep -q "local default" || ip -6 route add l>
+ExecStartPre=/bin/bash -c 'ip -6 rule show | grep -q "fwmark 0x1 lookup 100" || ip -6 rule add fwmark 1 table 100'
+ExecStartPre=/bin/bash -c 'ip -6 route show table 100 | grep -q "local default" || ip -6 route add local ::/0 dev lo table 100'
 
 # Load nftables rules
 ExecStart=/usr/sbin/nft -f /etc/nftables/xray-tproxy.nft
 
 # Reload: reapply all rules
-ExecReload=/bin/bash -c 'ip rule show | grep -q "fwmark 0x1 lookup 100" || ip rule add fwmark 1 tabl>
-ExecReload=/bin/bash -c 'ip route show table 100 | grep -q "local default" || ip route add local 0.0>
-ExecReload=/bin/bash -c 'ip -6 rule show | grep -q "fwmark 0x1 lookup 100" || ip -6 rule add fwmark >
-ExecReload=/bin/bash -c 'ip -6 route show table 100 | grep -q "local default" || ip -6 route add loc>
+ExecReload=/bin/bash -c 'ip rule show | grep -q "fwmark 0x1 lookup 100" || ip rule add fwmark 1 table 100'
+ExecReload=/bin/bash -c 'ip route show table 100 | grep -q "local default" || ip route add local 0.0.0.0/0 dev lo table 100'
+ExecReload=/bin/bash -c 'ip -6 rule show | grep -q "fwmark 0x1 lookup 100" || ip -6 rule add fwmark 1 table 100'
+ExecReload=/bin/bash -c 'ip -6 route show table 100 | grep -q "local default" || ip -6 route add local ::/0 dev lo table 100'
 ExecReload=/usr/sbin/nft -f /etc/nftables/xray-tproxy.nft
 
 # Cleanup on stop
