@@ -32,7 +32,7 @@ ExecStop=/bin/bash -c 'ip rule del fwmark 1 table 100 2>/dev/null || true'
 ExecStop=/bin/bash -c 'ip route del local 0.0.0.0/0 dev lo table 100 2>/dev/null || true'
 ExecStop=/bin/bash -c 'ip -6 rule del fwmark 1 table 100 2>/dev/null || true'
 ExecStop=/bin/bash -c 'ip -6 route del local ::/0 dev lo table 100 2>/dev/null || true'
-ExecStop=/bin/bash -c 'nft flush ruleset 2>/dev/null || true'
+ExecStop=/bin/bash -c 'nft delete table inet xray 2>/dev/null || true'
 
 # Security settings
 NoNewPrivileges=true
