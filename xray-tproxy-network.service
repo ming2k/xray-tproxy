@@ -9,40 +9,46 @@ Before=xray.service
 Type=oneshot
 RemainAfterExit=yes
 
-# Setup IPv4 routing rules
+# Routing rules (IPv4)
 ExecStartPre=/bin/bash -c 'ip rule show | grep -q "fwmark 0x1 lookup 100" || ip rule add fwmark 1 table 100'
 ExecStartPre=/bin/bash -c 'ip route show table 100 | grep -q "local default" || ip route add local 0.0.0.0/0 dev lo table 100'
 
-# Setup IPv6 routing rules
+# Routing rules (IPv6)
 ExecStartPre=/bin/bash -c 'ip -6 rule show | grep -q "fwmark 0x1 lookup 100" || ip -6 rule add fwmark 1 table 100'
 ExecStartPre=/bin/bash -c 'ip -6 route show table 100 | grep -q "local default" || ip -6 route add local ::/0 dev lo table 100'
 
-# Load nftables rules
+# NFTables (load configuration)
+ExecStartPre=-/usr/sbin/nft delete table ip xray_v4
+ExecStartPre=-/usr/sbin/nft delete table ip6 xray_v6
 ExecStart=/usr/sbin/nft -f /etc/nftables/xray-tproxy.nft
 
-# Reload: reapply all rules
+# Reload rules
 ExecReload=/bin/bash -c 'ip rule show | grep -q "fwmark 0x1 lookup 100" || ip rule add fwmark 1 table 100'
 ExecReload=/bin/bash -c 'ip route show table 100 | grep -q "local default" || ip route add local 0.0.0.0/0 dev lo table 100'
 ExecReload=/bin/bash -c 'ip -6 rule show | grep -q "fwmark 0x1 lookup 100" || ip -6 rule add fwmark 1 table 100'
 ExecReload=/bin/bash -c 'ip -6 route show table 100 | grep -q "local default" || ip -6 route add local ::/0 dev lo table 100'
+ExecReload=-/usr/sbin/nft delete table ip xray_v4
+ExecReload=-/usr/sbin/nft delete table ip6 xray_v6
 ExecReload=/usr/sbin/nft -f /etc/nftables/xray-tproxy.nft
 
 # Cleanup on stop
 ExecStop=/bin/bash -c 'ip rule del fwmark 1 table 100 2>/dev/null || true'
-ExecStop=/bin/bash -c 'ip route del local 0.0.0.0/0 dev lo table 100 2>/dev/null || true'
+ExecStop=/bin/bash -c 'ip route flush table 100 2>/dev/null || true'
 ExecStop=/bin/bash -c 'ip -6 rule del fwmark 1 table 100 2>/dev/null || true'
-ExecStop=/bin/bash -c 'ip -6 route del local ::/0 dev lo table 100 2>/dev/null || true'
-ExecStop=/bin/bash -c 'nft delete table inet xray 2>/dev/null || true'
+ExecStop=/bin/bash -c 'ip -6 route flush table 100 2>/dev/null || true'
+ExecStop=-/usr/sbin/nft delete table ip xray_v4
+ExecStop=-/usr/sbin/nft delete table ip6 xray_v6
 
-# Security settings
+# Security
 NoNewPrivileges=true
 ProtectSystem=false
 ProtectHome=true
 PrivateTmp=true
 
-# Restart settings
+# Timeout
 TimeoutStartSec=30
 TimeoutStopSec=15
 
 [Install]
 WantedBy=multi-user.target
+

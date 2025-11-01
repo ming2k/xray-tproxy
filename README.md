@@ -39,38 +39,31 @@ To apply this project's solution, please make sure the following related utils a
     sudo systemctl enable --now xray xray-tproxy-network
     ```
 
+It is functional but still needs improvement.
 
-(Optional) For better user experience:
+If you are using `systemd-networkd`, you will find that `ip rule` is gone after resuming from suspend. This is because that `systemd-networkd` reinitialize it.
 
-Disconnect and reconnect to wireless network:
+So you need to persist the config, the following is a recommended solution.
 
-Network card UP and Down will flush the NFTable rules.
-
-You need to restart the service to make it work, the following config can execute the operation automatically:
-
-```sh
-sudo cp ./network-monitor.path /etc/systemd/system/network-monitor.path
-sudo systemctl enable --now network-monitor.path
+```shell
+sudo nvim /etc/systemd/network/wlan0.network
 ```
 
-Or `udev` is more recommended:
+Add the following config:
 
-```sh
-sudo nano /etc/udev/rules.d/90-wlan-monitor.rules
+```config
+# ...
+[RoutingPolicyRule]
+# For XRay TProxy
+FirewallMark=1
+Table=100
 ```
 
-```udev
-ACTION=="change", SUBSYSTEM=="net", KERNEL=="wlan0", RUN+="/usr/bin/systemctl start xray-tproxy-network.service"
+Please replace NIC name with yours, Then
+
+```shell
+sudo systemctl reload systemd-networkd
 ```
-
-```sh
-sudo udevadm control --reload-rules
-sudo udevadm trigger --subsystem-match=net
-```
-
-Suspend / Resume to wireless modules:
-
-**TODO, not found a good solution to prevent restart network service manually**
 
 ## Operating Mechanism
 
