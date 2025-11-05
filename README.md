@@ -39,6 +39,8 @@ To apply this project's solution, please make sure the following related utils a
     sudo systemctl enable --now xray xray-tproxy-network
     ```
 
+---
+
 It is functional but still needs improvement.
 
 If you are using `systemd-networkd`, you will find that `ip rule` is gone after resuming from suspend. This is because that `systemd-networkd` reinitialize it.
@@ -64,6 +66,12 @@ Please replace NIC name with yours, Then
 ```shell
 sudo systemctl reload systemd-networkd
 ```
+
+---
+
+> [!WARNING]
+> Domain rules of route doesn't work since what requests xray get from nftables are all IPs.
+> TODO fix
 
 ## Operating Mechanism
 
