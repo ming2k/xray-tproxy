@@ -11,12 +11,9 @@
         "domains": ["geosite:cn"],
         "expectIPs": ["geoip:cn"]
       },
-      {
-        "address": "8.8.8.8",
-        "domains": ["geosite:geolocation-!cn"]
-      },
+      "8.8.8.8",
       "1.1.1.1",
-      "localhost"
+      "https+local://doh.dns.sb/dns-query"
     ]
   },
   "inbounds": [
@@ -27,6 +24,10 @@
       "settings": {
         "network": "tcp,udp",
         "followRedirect": true
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"]
       },
       "streamSettings": {
         "sockopt": {
@@ -58,6 +59,21 @@
     {
       "protocol": "blackhole",
       "tag": "blocked"
+    },
+    {
+      "tag": "dns-out",
+      "protocol": "dns",
+      "settings": {
+        "address": "8.8.8.8"
+      },
+      "proxySettings": {
+        "tag": "proxy"
+      },
+      "streamSettings": {
+        "sockopt": {
+          "mark": 2
+        }
+      }
     }
   ],
   "routing": {
@@ -65,23 +81,28 @@
     "rules": [
       {
         "type": "field",
-        "ip": [
-          "127.0.0.0/8",
-          "10.0.0.0/8",
-          "172.16.0.0/12",
-          "192.168.0.0/16",
-          "169.254.0.0/16"
-        ],
-        "outboundTag": "direct"
+        "inboundTag": ["all-in"],
+        "port": 53,
+        "outboundTag": "dns-out"
       },
       {
         "type": "field",
-        "domain": ["geosite:cn"],
+        "ip": ["8.8.8.8", "1.1.1.1"],
+        "outboundTag": "proxy"
+      },
+      {
+        "type": "field",
+        "protocol": [ "bittorrent" ],
         "outboundTag": "direct"
       },
       {
         "type": "field",
         "ip": ["geoip:cn"],
+        "outboundTag": "direct"
+      },
+      {
+        "type": "field",
+        "domain": ["geosite:cn"],
         "outboundTag": "direct"
       },
       {

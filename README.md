@@ -67,12 +67,6 @@ Please replace NIC name with yours, Then
 sudo systemctl reload systemd-networkd
 ```
 
----
-
-> [!WARNING]
-> Domain rules of route doesn't work since what requests xray get from nftables are all IPs.
-> TODO fix
-
 ## Operating Mechanism
 
 Step 1 - Traffic Hijacking: When your app tries to connect to google.com, the Linux firewall catches the packet before it leaves your computer and puts a special "mark" on it.
@@ -103,5 +97,14 @@ Key Insight: By combining packet marking with custom routing rules, we can inter
 ```
 
 
+### DNS
+
+DNS Parse:
+
+Firefox -> Glibc function -> /etc/resolv.conf -> tproxy + ip & nft rule -> xray:12345 [tag: all-in] -> xray route [tag: dns-out]
+
+Builtin DNS mechanism:
+
+After get IP from the above -> TLS connection -> DNS parse packet to get domain -> Following route -> If not found, using builtin dns query IP the using geoip rule.
 
 
