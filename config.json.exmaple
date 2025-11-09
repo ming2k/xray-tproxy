@@ -27,7 +27,7 @@
       },
       "sniffing": {
         "enabled": true,
-        "destOverride": ["http", "tls"]
+        "destOverride": ["http", "tls", "quic"]
       },
       "streamSettings": {
         "sockopt": {
@@ -63,12 +63,6 @@
     {
       "tag": "dns-out",
       "protocol": "dns",
-      "settings": {
-        "address": "8.8.8.8"
-      },
-      "proxySettings": {
-        "tag": "proxy"
-      },
       "streamSettings": {
         "sockopt": {
           "mark": 2

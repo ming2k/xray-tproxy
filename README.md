@@ -101,10 +101,6 @@ Key Insight: By combining packet marking with custom routing rules, we can inter
 
 DNS Parse:
 
-Firefox -> Glibc function -> /etc/resolv.conf -> tproxy + ip & nft rule -> xray:12345 [tag: all-in] -> xray route [tag: dns-out]
-
-Builtin DNS mechanism:
-
-After get IP from the above -> TLS connection -> DNS parse packet to get domain -> Following route -> If not found, using builtin dns query IP the using geoip rule.
+Firefox -> Glibc function -> /etc/resolv.conf -> following ip & nft rules under tproxy feature -> xray:12345 [tag: all-in] -> following xray route [tag: dns-out] -> dns-out use builtin dns -> builtin dns make geosite rule work
 
 

@@ -1,26 +1,25 @@
 #!/usr/sbin/nft -f
-
 flush ruleset
 
 # Reserved IPv4 address ranges
 define RESERVED_IP = {
-    10.0.0.0/8,
-    100.64.0.0/10,
-    127.0.0.0/8,
-    169.254.0.0/16,
-    172.16.0.0/12,
-    192.0.0.0/24,
-    224.0.0.0/4,
-    240.0.0.0/4,
-    255.255.255.255/32
+  10.0.0.0/8,
+  100.64.0.0/10,
+  127.0.0.0/8,
+  169.254.0.0/16,
+  172.16.0.0/12,
+  192.0.0.0/24,
+  224.0.0.0/4,
+  240.0.0.0/4,
+  255.255.255.255/32
 }
 
 # Reserved IPv6 address ranges
 define RESERVED_IP6 = {
-    ::1/128,
-    fc00::/7,
-    fe80::/10,
-    ff00::/8
+  ::1/128,
+  fc00::/7,
+  fe80::/10,
+  ff00::/8
 }
 
 # Basic constants
@@ -30,79 +29,119 @@ define XRAY_TPROXY_PORT = 12345
 
 # IPv4 Rules for Xray TProxy
 table ip xray_v4 {
-    chain prerouting {
-        type filter hook prerouting priority mangle; policy accept;
+  chain prerouting {
+    type filter hook prerouting priority mangle; policy accept;
 
-        # Skip reserved IP ranges
-        ip daddr $RESERVED_IP return
+    # Skip reserved IP ranges
+    ip daddr $RESERVED_IP return
 
-        # Allow local network DNS (port 53 only)
-        ip daddr 192.168.0.0/16 tcp dport != 53 return
-        ip daddr 192.168.0.0/16 udp dport != 53 return
+    # Allow local network DNS (port 53 only)
+    ip daddr 192.168.0.0/16 tcp dport != 53 return
+    ip daddr 192.168.0.0/16 udp dport != 53 return
 
-        # Skip packets already marked for bypass
-        meta mark $BYPASS_MARK return
+    # Skip packets already marked for bypass
+    meta mark $BYPASS_MARK return
 
-        # Redirect all TCP/UDP traffic to Xray TProxy
-        ip protocol tcp tproxy to 127.0.0.1:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
-        ip protocol udp tproxy to 127.0.0.1:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
-    }
+    # Bypass ICMP (ping, traceroute ICMP mode, etc.)
+    ip protocol icmp return
 
-    chain output {
-        type route hook output priority mangle; policy accept;
+    # Redirect all TCP/UDP traffic to Xray TProxy
+    ip protocol tcp tproxy to 127.0.0.1:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
+    ip protocol udp tproxy to 127.0.0.1:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
+  }
 
-        # Skip reserved IP ranges
-        ip daddr $RESERVED_IP return
+  chain output {
+    type route hook output priority mangle; policy accept;
 
-        # Allow local network DNS (port 53 only)
-        ip daddr 192.168.0.0/16 tcp dport != 53 return
-        ip daddr 192.168.0.0/16 udp dport != 53 return
+    # Bypass root user (UID 0)
+    meta skuid 0 return
 
-        # Skip packets already marked for bypass
-        meta mark $BYPASS_MARK return
+    # Skip reserved IP ranges
+    ip daddr $RESERVED_IP return
 
-        # Mark TCP/UDP packets for routing through Xray
-        ip protocol tcp meta mark set $XRAY_MARK counter
-        ip protocol udp meta mark set $XRAY_MARK counter
-    }
+    # Allow local network DNS (port 53 only)
+    ip daddr 192.168.0.0/16 tcp dport != 53 return
+    ip daddr 192.168.0.0/16 udp dport != 53 return
+
+    # Skip packets already marked for bypass
+    meta mark $BYPASS_MARK return
+
+    # Bypass ICMP from local machine
+    ip protocol icmp return
+
+    # Mark TCP/UDP packets for routing through Xray
+    ip protocol tcp meta mark set $XRAY_MARK counter
+    ip protocol udp meta mark set $XRAY_MARK counter
+  }
 }
 
 # IPv6 Rules for Xray TProxy
 table ip6 xray_v6 {
-    chain prerouting {
-        type filter hook prerouting priority mangle; policy accept;
+  chain prerouting {
+    type filter hook prerouting priority mangle; policy accept;
 
-        # Skip reserved IPv6 ranges
-        ip6 daddr $RESERVED_IP6 return
+    # Skip reserved IPv6 ranges
+    ip6 daddr $RESERVED_IP6 return
 
-        # Allow local network DNS (port 53 only)
-        ip6 daddr fc00::/7 tcp dport != 53 return
-        ip6 daddr fc00::/7 udp dport != 53 return
+    # Allow local network DNS (port 53 only)
+    ip6 daddr fc00::/7 tcp dport != 53 return
+    ip6 daddr fc00::/7 udp dport != 53 return
 
-        # Skip packets already marked for bypass
-        meta mark $BYPASS_MARK return
+    # Skip packets already marked for bypass
+    meta mark $BYPASS_MARK return
 
-        # Redirect all TCP/UDP traffic to Xray TProxy
-        ip6 nexthdr tcp tproxy to [::1]:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
-        ip6 nexthdr udp tproxy to [::1]:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
-    }
+    # Bypass essential ICMPv6
+    icmpv6 type {
+      destination-unreachable,
+      packet-too-big,
+      time-exceeded,
+      parameter-problem,
+      echo-request,
+      echo-reply,
+      nd-router-solicit,
+      nd-router-advert,
+      nd-neighbor-solicit,
+      nd-neighbor-advert
+    } return
 
-    chain output {
-        type route hook output priority mangle; policy accept;
+    # Redirect all TCP/UDP traffic to Xray TProxy
+    ip6 nexthdr tcp tproxy to [::1]:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
+    ip6 nexthdr udp tproxy to [::1]:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
+  }
 
-        # Skip reserved IPv6 ranges
-        ip6 daddr $RESERVED_IP6 return
+  chain output {
+    type route hook output priority mangle; policy accept;
 
-        # Allow local network DNS (port 53 only)
-        ip6 daddr fc00::/7 tcp dport != 53 return
-        ip6 daddr fc00::/7 udp dport != 53 return
+    # Bypass root user (UID 0)
+    meta skuid 0 return
 
-        # Skip packets already marked for bypass
-        meta mark $BYPASS_MARK return
+    # Skip reserved IPv6 ranges
+    ip6 daddr $RESERVED_IP6 return
 
-        # Mark TCP/UDP packets for routing through Xray
-        ip6 nexthdr tcp meta mark set $XRAY_MARK counter
-        ip6 nexthdr udp meta mark set $XRAY_MARK counter
-    }
+    # Allow local network DNS (port 53 only)
+    ip6 daddr fc00::/7 tcp dport != 53 return
+    ip6 daddr fc00::/7 udp dport != 53 return
+
+    # Skip packets already marked for bypass
+    meta mark $BYPASS_MARK return
+
+    # Bypass essential ICMPv6 from local machine
+    icmpv6 type {
+      destination-unreachable,
+      packet-too-big,
+      time-exceeded,
+      parameter-problem,
+      echo-request,
+      echo-reply,
+      nd-router-solicit,
+      nd-router-advert,
+      nd-neighbor-solicit,
+      nd-neighbor-advert
+    } return
+
+    # Mark TCP/UDP packets for routing through Xray
+    ip6 nexthdr tcp meta mark set $XRAY_MARK counter
+    ip6 nexthdr udp meta mark set $XRAY_MARK counter
+  }
 }
 
