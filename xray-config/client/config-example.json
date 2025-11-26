@@ -1,3 +1,5 @@
+// XTLS/REALITY reference: https://github.com/XTLS/REALITY
+// Xray installation: https://github.com/XTLS/Xray-install
 {
   "log": {
     "loglevel": "info",
@@ -107,4 +109,4 @@
     ]
   }
 }
-// vim: ft=jsonc
+// vim: set ft=jsonc:
