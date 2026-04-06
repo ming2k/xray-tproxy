@@ -9,14 +9,31 @@
   "dns": {
     "servers": [
       {
+        "address": "192.168.0.1",
+        "domains": [
+          "geosite:private",
+          "domain:local",
+          "domain:lan",
+          "domain:home.arpa"
+        ],
+        "finalQuery": true
+      },
+      {
         "address": "223.5.5.5",
         "domains": ["geosite:cn"],
-        "expectIPs": ["geoip:cn"]
+        "expectedIPs": ["geoip:cn"]
       },
-      "8.8.8.8",
-      "1.1.1.1",
-      "https+local://doh.dns.sb/dns-query"
-    ]
+      {
+        "address": "8.8.8.8",
+        "domains": [
+          "geosite:google",
+          "geosite:openai",
+          "geosite:anthropic"
+        ]
+      },
+      "8.8.8.8"
+    ],
+    "queryStrategy": "UseSystem"
   },
   "inbounds": [
     {
@@ -43,7 +60,31 @@
       "protocol": "vless",
       "tag": "proxy",
       "settings": {
-        // ...
+        "vnext": [
+          {
+            "address": "<SERVER_IP:203.0.113.10>",
+            "port": 10443,
+            "users": [
+              {
+                "id": "<UUID:a1b2c3d4-e5f6-7890-abcd-ef1234567890>",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "fingerprint": "chrome",
+          "serverName": "<SERVER_NAME:example.com>",
+          "publicKey": "<PUBLIC_KEY:REDACTED_PUBLIC_KEY>",
+          "shortId": "<SHORT_ID:0123456789abcdef>",
+          "spiderX": "/"
+        },
         "sockopt": {
           "mark": 2
         }
@@ -52,6 +93,9 @@
     {
       "protocol": "freedom",
       "tag": "direct",
+      "settings": {
+        "domainStrategy": "UseIPv4v6"
+      },
       "streamSettings": {
         "sockopt": {
           "mark": 2
@@ -61,15 +105,6 @@
     {
       "protocol": "blackhole",
       "tag": "blocked"
-    },
-    {
-      "tag": "dns-out",
-      "protocol": "dns",
-      "streamSettings": {
-        "sockopt": {
-          "mark": 2
-        }
-      }
     }
   ],
   "routing": {
@@ -77,14 +112,8 @@
     "rules": [
       {
         "type": "field",
-        "inboundTag": ["all-in"],
-        "port": 53,
-        "outboundTag": "dns-out"
-      },
-      {
-        "type": "field",
-        "ip": ["8.8.8.8", "1.1.1.1"],
-        "outboundTag": "proxy"
+        "ip": ["<SERVER_IP:203.0.113.10>"],
+        "outboundTag": "direct"
       },
       {
         "type": "field",
@@ -93,12 +122,29 @@
       },
       {
         "type": "field",
-        "ip": ["geoip:cn"],
+        "ip": ["geoip:private"],
         "outboundTag": "direct"
       },
       {
         "type": "field",
-        "domain": ["geosite:cn"],
+        "domain": [
+          "geosite:private",
+          "geosite:cn"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "type": "field",
+        "domain": [
+          "geosite:google",
+          "geosite:openai",
+          "geosite:anthropic"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "type": "field",
+        "ip": ["geoip:cn"],
         "outboundTag": "direct"
       },
       {

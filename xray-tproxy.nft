@@ -1,5 +1,4 @@
 #!/usr/sbin/nft -f
-flush ruleset
 
 # Reserved IPv4 address ranges
 define RESERVED_IP = {
@@ -35,7 +34,9 @@ table ip xray_v4 {
     # Skip reserved IP ranges
     ip daddr $RESERVED_IP return
 
-    # Allow local network DNS (port 53 only)
+    # Leave DNS to the local resolver; only proxy application traffic.
+    tcp dport 53 return
+    udp dport 53 return
     ip daddr 192.168.0.0/16 tcp dport != 53 return
     ip daddr 192.168.0.0/16 udp dport != 53 return
 
@@ -59,7 +60,9 @@ table ip xray_v4 {
     # Skip reserved IP ranges
     ip daddr $RESERVED_IP return
 
-    # Allow local network DNS (port 53 only)
+    # Leave DNS to the local resolver; only proxy application traffic.
+    tcp dport 53 return
+    udp dport 53 return
     ip daddr 192.168.0.0/16 tcp dport != 53 return
     ip daddr 192.168.0.0/16 udp dport != 53 return
 
@@ -83,7 +86,9 @@ table ip6 xray_v6 {
     # Skip reserved IPv6 ranges
     ip6 daddr $RESERVED_IP6 return
 
-    # Allow local network DNS (port 53 only)
+    # Leave DNS to the local resolver; only proxy application traffic.
+    tcp dport 53 return
+    udp dport 53 return
     ip6 daddr fc00::/7 tcp dport != 53 return
     ip6 daddr fc00::/7 udp dport != 53 return
 
@@ -118,7 +123,9 @@ table ip6 xray_v6 {
     # Skip reserved IPv6 ranges
     ip6 daddr $RESERVED_IP6 return
 
-    # Allow local network DNS (port 53 only)
+    # Leave DNS to the local resolver; only proxy application traffic.
+    tcp dport 53 return
+    udp dport 53 return
     ip6 daddr fc00::/7 tcp dport != 53 return
     ip6 daddr fc00::/7 udp dport != 53 return
 
@@ -144,4 +151,3 @@ table ip6 xray_v6 {
     ip6 nexthdr udp meta mark set $XRAY_MARK counter
   }
 }
-
