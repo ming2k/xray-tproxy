@@ -1,38 +1,35 @@
 [Unit]
 Description=Xray Transparent Proxy
+Documentation=https://github.com/XTLS/Xray-core
 After=network-online.target nss-lookup.target
 Wants=network-online.target
 
 [Service]
+Type=simple
 User=xray
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
-AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+WorkingDirectory=/etc/xray
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
 NoNewPrivileges=true
 
-# Routing rules (IPv4)
-ExecStartPre=+/bin/bash -c 'ip rule show | grep -q "fwmark 0x1 lookup 100" || ip rule add fwmark 1 table 100'
-ExecStartPre=+/bin/bash -c 'ip route show table 100 | grep -q "local default" || ip route add local 0.0.0.0/0 dev lo table 100'
+# Xray owns the dedicated local route in table 110.
+ExecStartPre=+/bin/bash -c 'ip route show table 110 | grep -q "local default" || ip route add local 0.0.0.0/0 dev lo table 110'
+ExecStartPre=+/bin/bash -c 'ip -6 route show table 110 | grep -q "local default" || ip -6 route add local ::/0 dev lo table 110'
 
-# Routing rules (IPv6)
-ExecStartPre=+/bin/bash -c 'ip -6 rule show | grep -q "fwmark 0x1 lookup 100" || ip -6 rule add fwmark 1 table 100'
-ExecStartPre=+/bin/bash -c 'ip -6 route show table 100 | grep -q "local default" || ip -6 route add local ::/0 dev lo table 100'
-
-# NFTables (load configuration)
+# Xray also owns the dedicated nftables tables for transparent proxying.
 ExecStartPre=+-/usr/sbin/nft delete table ip xray_v4
 ExecStartPre=+-/usr/sbin/nft delete table ip6 xray_v6
 ExecStartPre=+/usr/sbin/nft -f /etc/nftables/xray-tproxy.nft
 
 ExecStart=/usr/bin/xray run -confdir /etc/xray/
+
 Restart=on-failure
 RestartSec=5
 
-# Cleanup on stop
-ExecStop=+/bin/bash -c 'ip rule del fwmark 1 table 100 2>/dev/null || true'
-ExecStop=+/bin/bash -c 'ip route flush table 100 2>/dev/null || true'
-ExecStop=+/bin/bash -c 'ip -6 rule del fwmark 1 table 100 2>/dev/null || true'
-ExecStop=+/bin/bash -c 'ip -6 route flush table 100 2>/dev/null || true'
-ExecStop=+-/usr/sbin/nft delete table ip xray_v4
-ExecStop=+-/usr/sbin/nft delete table ip6 xray_v6
+ExecStopPost=+/bin/bash -c 'ip route flush table 110 2>/dev/null || true'
+ExecStopPost=+/bin/bash -c 'ip -6 route flush table 110 2>/dev/null || true'
+ExecStopPost=+-/usr/sbin/nft delete table ip xray_v4
+ExecStopPost=+-/usr/sbin/nft delete table ip6 xray_v6
 
 ProtectHome=true
 PrivateTmp=true
