@@ -1,3 +1,10 @@
+# Diagnostic reports
+xray-tproxy-diagnose-*.txt
+
+# Local client configs with real credentials — never commit
+xray-config/client/config-*.json
+!xray-config/client/config-example.json
+
 # macOS
 .DS_Store
 .DS_Store?
