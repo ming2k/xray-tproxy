@@ -37,8 +37,14 @@ table ip xray_v4 {
     # Leave DNS to the local resolver; only proxy application traffic.
     tcp dport 53 return
     udp dport 53 return
-    ip daddr 192.168.0.0/16 tcp dport != 53 return
-    ip daddr 192.168.0.0/16 udp dport != 53 return
+
+    # Leave plain HTTP direct: captive portals can only hijack cleartext
+    # HTTP to redirect clients to their login page. Proxying port 80 buys
+    # no confidentiality (it is plaintext anyway) and breaks portal login.
+    tcp dport 80 return
+
+    # LAN destinations stay direct (port 53 already returned above).
+    ip daddr 192.168.0.0/16 return
 
     # Skip packets already marked for bypass
     meta mark $BYPASS_MARK return
@@ -63,8 +69,14 @@ table ip xray_v4 {
     # Leave DNS to the local resolver; only proxy application traffic.
     tcp dport 53 return
     udp dport 53 return
-    ip daddr 192.168.0.0/16 tcp dport != 53 return
-    ip daddr 192.168.0.0/16 udp dport != 53 return
+
+    # Leave plain HTTP direct: captive portals can only hijack cleartext
+    # HTTP to redirect clients to their login page. Proxying port 80 buys
+    # no confidentiality (it is plaintext anyway) and breaks portal login.
+    tcp dport 80 return
+
+    # LAN destinations stay direct (port 53 already returned above).
+    ip daddr 192.168.0.0/16 return
 
     # Skip packets already marked for bypass
     meta mark $BYPASS_MARK return
@@ -89,8 +101,14 @@ table ip6 xray_v6 {
     # Leave DNS to the local resolver; only proxy application traffic.
     tcp dport 53 return
     udp dport 53 return
-    ip6 daddr fc00::/7 tcp dport != 53 return
-    ip6 daddr fc00::/7 udp dport != 53 return
+
+    # Leave plain HTTP direct: captive portals can only hijack cleartext
+    # HTTP to redirect clients to their login page. Proxying port 80 buys
+    # no confidentiality (it is plaintext anyway) and breaks portal login.
+    tcp dport 80 return
+
+    # LAN destinations stay direct (port 53 already returned above).
+    ip6 daddr fc00::/7 return
 
     # Skip packets already marked for bypass
     meta mark $BYPASS_MARK return
@@ -126,8 +144,14 @@ table ip6 xray_v6 {
     # Leave DNS to the local resolver; only proxy application traffic.
     tcp dport 53 return
     udp dport 53 return
-    ip6 daddr fc00::/7 tcp dport != 53 return
-    ip6 daddr fc00::/7 udp dport != 53 return
+
+    # Leave plain HTTP direct: captive portals can only hijack cleartext
+    # HTTP to redirect clients to their login page. Proxying port 80 buys
+    # no confidentiality (it is plaintext anyway) and breaks portal login.
+    tcp dport 80 return
+
+    # LAN destinations stay direct (port 53 already returned above).
+    ip6 daddr fc00::/7 return
 
     # Skip packets already marked for bypass
     meta mark $BYPASS_MARK return
