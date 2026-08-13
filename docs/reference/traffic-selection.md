@@ -18,26 +18,25 @@ traffic).
 
 ## Intercepted
 
-Everything not listed under "Bypassed" is redirected to Xray:
+Everything not listed under "Bypassed" is redirected to Xray (including System DNS port 53, Plain HTTP port 80, and Root process traffic):
 
 | Chain | Action |
 |-------|--------|
 | `prerouting` (v4/v6) | `tproxy to 127.0.0.1:12345` / `[::1]:12345`, set mark `1` |
 | `output` (v4/v6) | set mark `1`; policy routing delivers to loopback |
 
-## Bypassed
+## Bypassed (Kernel-Level)
 
 Rules evaluate top to bottom; first match returns from the chain.
 
 | Traffic | Rule | Reason |
 |---------|------|--------|
 | Reserved ranges (`10/8`, `100.64/10`, `127/8`, `169.254/16`, `172.16/12`, ...; IPv6 ULA/link-local/multicast) | `ip daddr $RESERVED_IP return` (and v6 twin) | Local and non-routable destinations stay direct |
-| DNS, TCP and UDP port 53 | `tcp dport 53 return`, `udp dport 53 return` | System DNS belongs to the local resolver; see [DNS](../explanation/dns.md) |
-| Plain HTTP, TCP port 80 | `tcp dport 80 return` | Captive portals can only hijack cleartext HTTP; see [Captive Portals](../explanation/captive-portals.md) |
-| LAN (`192.168/16`, `fc00::/7`) | `ip daddr 192.168.0.0/16 return` (and v6 twin) | LAN services stay direct; port 53 already returned above |
+| LAN (`192.168/16`, `fc00::/7`) | `ip daddr 192.168.0.0/16 return` (and v6 twin) | Local network services stay direct |
 | Mark-2 packets | `meta mark $BYPASS_MARK return` | Xray's own outbound connections must not loop |
 | ICMP / essential ICMPv6 | `ip protocol icmp return`, `icmpv6 type { ... } return` | Ping and neighbor discovery keep working |
-| Root-generated traffic, `output` only | `meta skuid 0 return` | Administrative shells stay direct |
+
+Note: Higher-level application traffic (DNS port 53, HTTP port 80, Root processes) is intercepted by nftables and classified by Xray's routing engine (`geosite:cn`, `geosite:captive-portal`, `geoip:private`, etc.).
 
 ## Live Inspection
 
@@ -48,3 +47,4 @@ sudo nft list table ip6 xray_v6
 
 Every intercept rule carries a `counter` that increments per matched
 packet.
+

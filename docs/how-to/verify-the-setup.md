@@ -29,14 +29,13 @@ The counters on the `tproxy` / `meta mark set` rules should grow.
 
 ```sh
 curl -s https://api.ipify.org    # expect: your server's IP (proxied)
-curl -s http://ip.sb             # expect: your real IP (direct)
+curl -s http://api.ipify.org     # expect: your server's IP (proxied; port 80 is protected)
+dig +short google.com            # expect: authentic overseas IP (Real-IP via DoH)
 ```
 
-The two commands returning different addresses is expected: TCP port 80
-bypasses the proxy by design. See
-[Traffic Selection Reference](../reference/traffic-selection.md) for the
-full bypass list and [Captive Portals](../explanation/captive-portals.md)
-for the reason.
+Both HTTP (port 80) and HTTPS (port 443) for overseas destinations travel through the proxy tunnel. Domain resolution uses Real-IP via DoH without FakeIP subnet anomalies. See
+[Traffic Selection Reference](../reference/traffic-selection.md) and [DNS](../explanation/dns.md).
+
 
 ## Check the Logs
 

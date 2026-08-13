@@ -73,8 +73,7 @@ sudo networkctl reconfigure wlan0   # replace with your uplink
 
 ## Create the Xray Client Config
 
-The service starts Xray with `-confdir /etc/xray/`, so every `*.json`
-file in that directory is loaded and merged. Install exactly one config:
+The service starts Xray with `-config /etc/xray/config.json`. Install the client config:
 
 ```sh
 sudo install -d /etc/xray
@@ -90,31 +89,8 @@ Validate the result before continuing:
 sudo -u xray xray -test -config /etc/xray/config.json
 ```
 
-## Migrate an Existing Deployment
+The systemd service unit automatically manages `/var/log/xray` directory creation and ownership via `LogsDirectory=xray`.
 
-Upgrading from an older layout (root-run unit, single `-config` file,
-multiple configs in `/etc/xray/`) needs three extra steps:
-
-1. Create the `xray` user if it does not exist; without it the unit
-   fails with `status=217/USER`.
-2. The repo unit loads every `*.json` in `/etc/xray/` (`-confdir`), so
-   park every file except the active `config.json`:
-
-   ```sh
-   sudo mkdir -p /etc/xray-pool
-   sudo mv /etc/xray/config-*.json /etc/xray/*.bak.* /etc/xray-pool/
-   ```
-
-3. Run `sudo systemctl daemon-reload` after installing the unit and the
-   drop-in.
-
-## Create the Log Directory
-
-The example config logs to `/var/log/xray/`:
-
-```sh
-sudo install -d -o xray -g xray /var/log/xray
-```
 
 ## Point the System Resolver at the Local Stub
 

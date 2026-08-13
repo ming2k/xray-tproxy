@@ -34,19 +34,10 @@ table ip xray_v4 {
     # Skip reserved IP ranges
     ip daddr $RESERVED_IP return
 
-    # Leave DNS to the local resolver; only proxy application traffic.
-    tcp dport 53 return
-    udp dport 53 return
-
-    # Leave plain HTTP direct: captive portals can only hijack cleartext
-    # HTTP to redirect clients to their login page. Proxying port 80 buys
-    # no confidentiality (it is plaintext anyway) and breaks portal login.
-    tcp dport 80 return
-
-    # LAN destinations stay direct (port 53 already returned above).
+    # LAN destinations stay direct
     ip daddr 192.168.0.0/16 return
 
-    # Skip packets already marked for bypass
+    # Skip packets already marked for bypass (e.g. Xray outbounds)
     meta mark $BYPASS_MARK return
 
     # Bypass ICMP (ping, traceroute ICMP mode, etc.)
@@ -60,25 +51,13 @@ table ip xray_v4 {
   chain output {
     type route hook output priority mangle; policy accept;
 
-    # Bypass root user (UID 0)
-    meta skuid 0 return
-
     # Skip reserved IP ranges
     ip daddr $RESERVED_IP return
 
-    # Leave DNS to the local resolver; only proxy application traffic.
-    tcp dport 53 return
-    udp dport 53 return
-
-    # Leave plain HTTP direct: captive portals can only hijack cleartext
-    # HTTP to redirect clients to their login page. Proxying port 80 buys
-    # no confidentiality (it is plaintext anyway) and breaks portal login.
-    tcp dport 80 return
-
-    # LAN destinations stay direct (port 53 already returned above).
+    # LAN destinations stay direct
     ip daddr 192.168.0.0/16 return
 
-    # Skip packets already marked for bypass
+    # Skip packets already marked for bypass (e.g. Xray outbounds)
     meta mark $BYPASS_MARK return
 
     # Bypass ICMP from local machine
@@ -98,19 +77,10 @@ table ip6 xray_v6 {
     # Skip reserved IPv6 ranges
     ip6 daddr $RESERVED_IP6 return
 
-    # Leave DNS to the local resolver; only proxy application traffic.
-    tcp dport 53 return
-    udp dport 53 return
-
-    # Leave plain HTTP direct: captive portals can only hijack cleartext
-    # HTTP to redirect clients to their login page. Proxying port 80 buys
-    # no confidentiality (it is plaintext anyway) and breaks portal login.
-    tcp dport 80 return
-
-    # LAN destinations stay direct (port 53 already returned above).
+    # LAN destinations stay direct
     ip6 daddr fc00::/7 return
 
-    # Skip packets already marked for bypass
+    # Skip packets already marked for bypass (e.g. Xray outbounds)
     meta mark $BYPASS_MARK return
 
     # Bypass essential ICMPv6
@@ -135,25 +105,13 @@ table ip6 xray_v6 {
   chain output {
     type route hook output priority mangle; policy accept;
 
-    # Bypass root user (UID 0)
-    meta skuid 0 return
-
     # Skip reserved IPv6 ranges
     ip6 daddr $RESERVED_IP6 return
 
-    # Leave DNS to the local resolver; only proxy application traffic.
-    tcp dport 53 return
-    udp dport 53 return
-
-    # Leave plain HTTP direct: captive portals can only hijack cleartext
-    # HTTP to redirect clients to their login page. Proxying port 80 buys
-    # no confidentiality (it is plaintext anyway) and breaks portal login.
-    tcp dport 80 return
-
-    # LAN destinations stay direct (port 53 already returned above).
+    # LAN destinations stay direct
     ip6 daddr fc00::/7 return
 
-    # Skip packets already marked for bypass
+    # Skip packets already marked for bypass (e.g. Xray outbounds)
     meta mark $BYPASS_MARK return
 
     # Bypass essential ICMPv6 from local machine
@@ -175,3 +133,4 @@ table ip6 xray_v6 {
     ip6 nexthdr udp meta mark set $XRAY_MARK counter
   }
 }
+

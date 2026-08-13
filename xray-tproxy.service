@@ -21,7 +21,7 @@ ExecStartPre=+-/usr/sbin/nft delete table ip xray_v4
 ExecStartPre=+-/usr/sbin/nft delete table ip6 xray_v6
 ExecStartPre=+/usr/sbin/nft -f /etc/nftables/xray-tproxy.nft
 
-ExecStart=/usr/bin/xray run -confdir /etc/xray/
+ExecStart=/usr/bin/xray run -config /etc/xray/config.json
 
 Restart=on-failure
 RestartSec=5
@@ -31,10 +31,13 @@ ExecStopPost=+/bin/bash -c 'ip -6 route flush table 110 2>/dev/null || true'
 ExecStopPost=+-/usr/sbin/nft delete table ip xray_v4
 ExecStopPost=+-/usr/sbin/nft delete table ip6 xray_v6
 
+LogsDirectory=xray
+StateDirectory=xray
 ProtectHome=true
 PrivateTmp=true
 TimeoutStartSec=30
 TimeoutStopSec=15
+
 
 [Install]
 WantedBy=multi-user.target

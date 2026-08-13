@@ -59,8 +59,9 @@ rule itself whenever it reconfigures the uplink, and
 
 Xray runs as the dedicated `xray` user with only
 `CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW`; it cannot read user home
-directories (`ProtectHome=true`). Loop prevention does not depend on the
-UID: Xray's own outbound connections carry `sockopt.mark: 2`, which the
-nftables rules bypass explicitly. The `meta skuid 0 return` rule in the
-`output` chains is an administrative convenience so root shells always
-reach the network directly.
+directories (`ProtectHome=true`). Loop prevention relies on mark matching:
+Xray's own outbound connections carry `sockopt.mark: 2`, which the
+nftables rules (`meta mark 2 return`) bypass explicitly. All process traffic
+(including root administrative processes) is transparently intercepted and
+routed according to Xray's rules.
+

@@ -10,9 +10,12 @@ no per-application proxy configuration needed.
 It is tuned for a workstation or laptop running `systemd-networkd` and a
 local resolver such as `systemd-resolved`:
 
-- nftables only intercepts application traffic; DNS and plain HTTP stay direct
-- captive portals on public Wi-Fi keep working
-- the fwmark policy rule survives suspend/resume because `systemd-networkd` owns it
+- **Real-IP Smart DNS Split**: All DNS is handled via Xray DoH; applications receive authentic, unpolluted IP addresses without FakeIP subnet anomalies
+- **Full TProxy Protection**: Both HTTP (port 80) and HTTPS (port 443) for overseas destinations travel through the proxy tunnel, protecting against ISP hijacking and GFW blocks
+- **Captive Portal Compatible**: Wi-Fi portal probes (`geosite:captive-portal`) and LAN destinations remain direct for automatic Wi-Fi login popups
+- **Root Process Proxying**: `sudo apt update`, `docker pull`, and admin processes are transparently proxied according to Xray routing rules
+- **Resilient Policy Routing**: The fwmark policy rule survives suspend/resume cycles because `systemd-networkd` owns it
+
 
 ## Quick Start
 
@@ -28,11 +31,11 @@ sudo install -m644 ./xray-policy.conf /etc/systemd/network/20-wireless.network.d
 sudo install -d /etc/xray
 sudo cp ./xray-config/client/config-example.json /etc/xray/config.json
 sudoedit /etc/xray/config.json          # fill in every <PLACEHOLDER:...>
-sudo install -d -o xray -g xray /var/log/xray
 sudo systemctl reload systemd-networkd && sudo networkctl reconfigure wlan0
 sudo systemctl daemon-reload
 sudo systemctl enable --now xray-tproxy.service
 ```
+
 
 Adjust the `.network.d/` path to the `.network` file that manages your
 uplink. For prerequisites, per-step explanations, and optional parts, see

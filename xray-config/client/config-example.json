@@ -19,13 +19,22 @@
         "finalQuery": true
       },
       {
-        "address": "https://223.5.5.5/dns-query",
-        "domains": ["geosite:cn"],
-        "expectedIPs": ["geoip:cn"]
+        "address": "223.5.5.5",
+        "domains": [
+          "geosite:cn",
+          "domain:connectivitycheck.gstatic.com",
+          "domain:captive.apple.com",
+          "domain:detectportal.firefox.com",
+          "domain:msftconnecttest.com",
+          "domain:msftncsi.com"
+        ],
+        "expectedIPs": [
+          "geoip:cn"
+        ]
       },
-      "https://223.5.5.5/dns-query"
+      "8.8.8.8"
     ],
-    "queryStrategy": "UseSystem"
+    "queryStrategy": "UseIPv4"
   },
   "inbounds": [
     {
@@ -38,7 +47,8 @@
       },
       "sniffing": {
         "enabled": true,
-        "destOverride": ["http", "tls", "quic"]
+        "destOverride": ["http", "tls", "quic"],
+        "routeOnly": true
       },
       "streamSettings": {
         "sockopt": {
@@ -57,7 +67,8 @@
       },
       "sniffing": {
         "enabled": true,
-        "destOverride": ["http", "tls", "quic"]
+        "destOverride": ["http", "tls", "quic"],
+        "routeOnly": true
       }
     }
   ],
@@ -109,6 +120,10 @@
       }
     },
     {
+      "protocol": "dns",
+      "tag": "dns-out"
+    },
+    {
       "protocol": "blackhole",
       "tag": "blocked"
     }
@@ -116,6 +131,15 @@
   "routing": {
     "domainStrategy": "IPIfNonMatch",
     "rules": [
+      {
+        "type": "field",
+        "inboundTag": [
+          "all-in",
+          "socks-in"
+        ],
+        "port": 53,
+        "outboundTag": "dns-out"
+      },
       {
         "type": "field",
         "ip": ["<SERVER_IP:203.0.113.10>"],
@@ -135,7 +159,12 @@
         "type": "field",
         "domain": [
           "geosite:private",
-          "geosite:cn"
+          "geosite:cn",
+          "domain:connectivitycheck.gstatic.com",
+          "domain:captive.apple.com",
+          "domain:detectportal.firefox.com",
+          "domain:msftconnecttest.com",
+          "domain:msftncsi.com"
         ],
         "outboundTag": "direct"
       },
@@ -162,3 +191,4 @@
   }
 }
 // vim: set ft=jsonc:
+

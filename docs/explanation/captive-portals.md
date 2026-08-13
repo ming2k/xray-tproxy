@@ -34,28 +34,21 @@ pre-auth.
 
 ## How This Setup Avoids The Conflict
 
-- The nftables rules leave TCP port 80 direct
-  (`tcp dport 80 return`). The gateway always sees naked HTTP and can
-  hijack it, exactly as on a phone. Proxying port 80 would buy no
-  confidentiality — HTTP is plaintext by design — so nothing of value is
-  lost.
-- DNS (port 53) also stays direct, so the gateway's DNS answers — real or
-  spoofed — reach applications unmodified. Pre-auth resolution can be
-  slow, because the walled garden rate-limits or drops some queries, but
-  it is not intercepted by the proxy layer.
+Instead of unencrypted global bypasses in nftables, traffic interception and captive portal compatibility are handled via Xray's routing engine:
 
-With both channels intact, any plain-HTTP request triggers the hijack;
-opening one in the browser is all the detection the flow needs. Usage is
-documented in
-[How to Use Captive Portal Networks](../how-to/use-captive-portal-networks.md).
+- **Probe Domain Direct Routing**: Xray routes `geosite:captive-portal` (such as Apple's `hotspot-detect`, Android's `generate_204`, and Firefox's `detectportal.firefox.com`) and `geosite:private` / `geoip:private` to the **`direct`** outbound.
+- **Unauthenticated Flow**: Before Wi-Fi login, remote proxy servers are unreachable. When OS probes initiate HTTP requests, Xray routes them via `direct` out the local wireless interface. The Wi-Fi gateway sees the naked HTTP probe, hijacks it with a `302 Redirect`, and opens the portal login page.
+- **Authenticated Protection**: Once logged in, regular HTTP (port 80) and HTTPS (port 443) traffic to overseas destinations travel securely through the proxy tunnel, preventing ISP HTTP hijacking and allowing access to blocked HTTP sites.
 
-## Remaining Limitation
+## Edge Case Limitation
 
-A few portals host the login page on a public HTTPS address (some
-commercial SaaS providers). The hijacked probe redirects the browser to an
-HTTPS URL on a public IP, which still goes through the proxy and cannot
-connect pre-auth. No static rule set can enumerate those providers in
-advance, so the fallback is operational: stop `xray-tproxy.service` for
-the login, start it again afterwards. The unit's `ExecStopPost` teardown
-makes that safe and complete; see
-[Architecture](architecture.md#component-ownership).
+A few commercial portals host their login page on a public HTTPS domain. Pre-authentication, the walled garden blocks all external IPs, including proxy servers. If automatic detection does not trigger on a specific network, stop the service temporarily for login and restart it afterwards:
+
+```sh
+sudo systemctl stop xray-tproxy.service
+# complete Wi-Fi login in browser
+sudo systemctl start xray-tproxy.service
+```
+
+The unit's `ExecStopPost` teardown restores plain networking completely and safely; see [Architecture](architecture.md#component-ownership).
+

@@ -1,58 +1,40 @@
-# DNS
+# Real-IP DNS Architecture
 
-Two independent DNS paths exist on the host, and the design keeps them
-separate on purpose.
+This setup uses a **Real-IP Smart DNS Split** architecture. All system DNS queries (UDP/TCP port 53) are intercepted by nftables and handled by Xray's internal DNS module via the `dns-out` outbound, delivering unpolluted real IP addresses without resorting to FakeIP.
 
-## The Two Paths
-
-- **System DNS** resolves names for applications. Applications read
-  `/etc/resolv.conf` and query the local resolver (`systemd-resolved` by
-  default). The nftables rules never touch TCP/UDP port 53, so these
-  queries always travel directly to the resolver's upstream — typically
-  the DHCP-provided server of the current network.
-- **Xray built-in DNS** resolves names for Xray itself: routing decisions
-  (`geosite:cn` and similar groups need answers to classify) and dialing
-  for the `direct` outbound. The `dns.servers` list routes private
-  domains to the LAN gateway and everything else to AliDNS over DoH
-  (`https://223.5.5.5/dns-query`), with `geosite:cn` answers verified
-  against `geoip:cn`. Proxied domains are not resolved locally at all —
-  `sniffing.destOverride` dials them by name and the server resolves them
-  at its end.
+## The DNS Flow
 
 ```text
-Application -> /etc/resolv.conf -> local resolver -> answer
-
-Application traffic -> nft tproxy -> xray:12345 [all-in]
-                    -> Xray routing -> direct / proxy
+Application -> System Resolver -> Port 53 -> nftables TProxy -> Xray dokodemo-door
+                                                                      │
+                                                               routing (port 53)
+                                                                      │
+                                                                      ▼
+                                                                  dns-out
+                                                                      │
+                                                             Xray DNS Module
+                                                        ┌─────────────┴─────────────┐
+                                                        ▼                           ▼
+                                                Domestic / Captive           Foreign Domains
+                                                (223.5.5.5 / LAN)         (DoH https://1.1.1.1)
+                                                        │                           │
+                                                Real domestic IP            Real overseas IP
 ```
 
-## Why Port 53 Stays Direct
+## How Real-IP DNS Split Works
 
-Hijacking all port-53 traffic into Xray would make Xray the system-wide
-DNS server. That has three costs this setup avoids:
+1. **System DNS Interception**:
+   Applications send DNS queries (port 53) to the local resolver or ISP DNS as usual. nftables redirects these queries to Xray's `all-in` inbound. A routing rule matches `port: 53` and sends queries to `"outboundTag": "dns-out"`.
 
-- the local resolver's per-link split (different DNS per network) and its
-  cache are bypassed;
-- captive portals rely on answering application DNS queries themselves —
-  intercepting those queries breaks portal detection (see
-  [Captive Portals](captive-portals.md));
-- a misconfigured Xray DNS module takes down name resolution for the
-  whole host instead of just the proxy path.
+2. **Smart DNS Routing inside Xray**:
+   - **Domestic & Captive Portal Domains** (`geosite:cn`, `geosite:captive-portal`, `geosite:private`): Resolved via fast domestic DNS (`223.5.5.5` or LAN gateway). Applications receive true domestic IP addresses, guaranteeing optimal CDN routing.
+   - **Foreign & Blocked Domains**: Resolved via encrypted **DNS-over-HTTPS (DoH)** (e.g. `https://1.1.1.1/dns-query`) through the `proxy` outbound. GFW cannot poison or eavesdrop on DNS lookups.
 
-## Poisoned Answers And Sniffing
+3. **No FakeIP Pollution**:
+   Applications receive **real overseas IP addresses** (e.g. `142.250.x.x` for Google).
+   - Tools like `ping`, `dig`, `nslookup`, `traceroute`, and `ss` display authentic IP addresses.
+   - Debugging, development environments, P2P/WebRTC, and local network discovery tools continue to work natively without FakeIP subnet anomalies (`198.18.x.x`).
 
-On untrusted networks the system resolver can receive poisoned answers for
-blocked domains. Two mechanisms limit the damage:
+4. **TLS/HTTP Sniffing Backup**:
+   For TLS/HTTP/QUIC traffic, Xray's `sniffing.destOverride` continues to inspect SNI and Host headers (`routeOnly: true`), ensuring domain-based routing decisions remain accurate regardless of client IP resolution.
 
-- `sniffing.destOverride` lets Xray dial the sniffed TLS SNI / HTTP Host
-  domain instead of the original destination IP, so for proxied traffic a
-  wrong answer never reaches the wire — the server resolves the name at
-  its end.
-- Traffic that matches a `direct` rule does dial the resolver-provided
-  address, so `direct`-routed domains still depend on system DNS quality.
-  The `dns.servers` split keeps Chinese domains on a domestic resolver,
-  which is the traffic class that goes `direct`.
-
-This division of labor is why the config's routing rules, the `dns`
-module, and the nftables port-53 bypass are designed as one unit; changing
-one without the others shifts which failure modes are possible.
