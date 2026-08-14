@@ -1,6 +1,6 @@
 # Real-IP DNS Architecture
 
-This setup uses a **Real-IP Smart DNS Split** architecture. All system DNS queries (UDP/TCP port 53) are intercepted by nftables and handled by Xray's internal DNS module via the `dns-out` outbound, delivering unpolluted real IP addresses without resorting to FakeIP.
+This setup uses a **Real-IP Smart DNS Split** architecture. All system DNS queries (UDP/TCP port 53) are intercepted by nftables before IP bypass rules and handled by Xray's internal DNS module via the `dns-out` outbound, delivering unpolluted real IP addresses without resorting to FakeIP.
 
 ## The DNS Flow
 
@@ -13,22 +13,24 @@ Application -> System Resolver -> Port 53 -> nftables TProxy -> Xray dokodemo-do
                                                                   dns-out
                                                                       │
                                                              Xray DNS Module
-                                                        ┌─────────────┴─────────────┐
-                                                        ▼                           ▼
-                                                Domestic / Captive           Foreign Domains
-                                                (223.5.5.5 / LAN)         (DoH https://1.1.1.1)
-                                                        │                           │
-                                                Real domestic IP            Real overseas IP
+                                          ┌───────────────────────────┼───────────────────────────┐
+                                          ▼                           ▼                           ▼
+                                  Portal & Local Domains        Domestic Domains           Foreign Domains
+                                 (localhost / system resolver)      (223.5.5.5)         (DoH https://1.1.1.1)
+                                          │                           │                           │
+                                   DHCP DNS / Portal IP       Real domestic IP            Real overseas IP
 ```
 
 ## How Real-IP DNS Split Works
 
 1. **System DNS Interception**:
-   Applications send DNS queries (port 53) to the local resolver or ISP DNS as usual. nftables redirects these queries to Xray's `all-in` inbound. A routing rule matches `port: 53` and sends queries to `"outboundTag": "dns-out"`.
+   Applications send DNS queries (port 53) to the local resolver or ISP DNS as usual. nftables intercepts all port 53 traffic before private IP bypass rules and redirects queries to Xray's `all-in` inbound. A routing rule matches `port: 53` and sends queries to `"outboundTag": "dns-out"`.
 
 2. **Smart DNS Routing inside Xray**:
-   - **Domestic & Captive Portal Domains** (`geosite:cn`, `geosite:captive-portal`, `geosite:private`): Resolved via fast domestic DNS (`223.5.5.5` or LAN gateway). Applications receive true domestic IP addresses, guaranteeing optimal CDN routing.
-   - **Foreign & Blocked Domains**: Resolved via encrypted **DNS-over-HTTPS (DoH)** (e.g. `https://1.1.1.1/dns-query`) through the `proxy` outbound. GFW cannot poison or eavesdrop on DNS lookups.
+   - **Local & Captive Portal Domains** (`geosite:private`, `domain:local`, captive portal probe domains): Resolved via `localhost` (`systemd-resolved` / `127.0.0.53`), which forwards dynamically to the current uplink's DHCP-assigned DNS. On captive portal networks pre-authentication, this resolves the portal login server immediately.
+   - **Foreign, Blocked & Hybrid/AI Domains** (`geosite:geolocation-!cn`, `geosite:google`, `geosite:openai`, `geosite:anthropic`, `domain:z.ai`): Evaluated before `geosite:cn` and resolved via encrypted **DNS-over-HTTPS (DoH)** (e.g. `https://1.1.1.1/dns-query`) through the `proxy` outbound. This ensures clean resolution and prevents dual-homed or overseas-backed services (like `z.ai`) from triggering `expectedIPs: ["geoip:cn"]` dropouts.
+   - **Domestic Domains** (`geosite:cn`): Resolved via fast domestic DNS (`223.5.5.5`) with `expectedIPs: ["geoip:cn"]`. Applications receive authentic domestic IP addresses, guaranteeing optimal CDN routing.
+   - **Fallback**: Any unmatched domain defaults to encrypted DoH (`https://1.1.1.1/dns-query`).
 
 3. **No FakeIP Pollution**:
    Applications receive **real overseas IP addresses** (e.g. `142.250.x.x` for Google).

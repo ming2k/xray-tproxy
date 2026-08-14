@@ -12,9 +12,9 @@ local resolver such as `systemd-resolved`:
 
 - **Real-IP Smart DNS Split**: All DNS is handled via Xray DoH; applications receive authentic, unpolluted IP addresses without FakeIP subnet anomalies
 - **Full TProxy Protection**: Both HTTP (port 80) and HTTPS (port 443) for overseas destinations travel through the proxy tunnel, protecting against ISP hijacking and GFW blocks
-- **Captive Portal Compatible**: Wi-Fi portal probes (`geosite:captive-portal`) and LAN destinations remain direct for automatic Wi-Fi login popups
+- **Captive Portal Compatible**: Portal probes dynamically resolve via local DHCP DNS and route direct for automatic Wi-Fi login popups
 - **Root Process Proxying**: `sudo apt update`, `docker pull`, and admin processes are transparently proxied according to Xray routing rules
-- **Resilient Policy Routing**: The fwmark policy rule survives suspend/resume cycles because `systemd-networkd` owns it
+- **Resilient Policy Routing**: The fwmark policy rule natively survives sleep/wake and interface switching because `systemd-networkd` owns it
 
 
 ## Quick Start
@@ -22,7 +22,10 @@ local resolver such as `systemd-resolved`:
 Run from the repository root:
 
 ```sh
+# prepare
 sudo useradd --system --no-create-home --shell /usr/bin/nologin xray
+
+# core files
 sudo install -Dm644 ./xray-tproxy.nft /etc/nftables/xray-tproxy.nft
 sudo install -Dm644 ./xray-tproxy.service /etc/systemd/system/xray-tproxy.service
 sudo install -Dm644 ./xray-tproxy.service.d/geo-assets.conf /etc/systemd/system/xray-tproxy.service.d/geo-assets.conf
@@ -31,6 +34,8 @@ sudo install -m644 ./xray-policy.conf /etc/systemd/network/20-wireless.network.d
 sudo install -d /etc/xray
 sudo cp ./xray-config/client/config-example.json /etc/xray/config.json
 sudoedit /etc/xray/config.json          # fill in every <PLACEHOLDER:...>
+
+# enable services
 sudo systemctl reload systemd-networkd && sudo networkctl reconfigure wlan0
 sudo systemctl daemon-reload
 sudo systemctl enable --now xray-tproxy.service
@@ -49,3 +54,4 @@ See the [Documentation Index](docs/index.md). Frequently used pages:
 - [How to Use Captive Portal Networks](docs/how-to/use-captive-portal-networks.md)
 - [Client Configuration Reference](docs/reference/client-configuration.md)
 - [Architecture](docs/explanation/architecture.md)
+- [Data Packet Lifecycle](docs/explanation/packet-lifecycle.md)

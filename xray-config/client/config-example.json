@@ -9,30 +9,40 @@
   "dns": {
     "servers": [
       {
-        "address": "192.168.0.1",
+        "address": "localhost",
         "domains": [
           "geosite:private",
           "domain:local",
           "domain:lan",
-          "domain:home.arpa"
-        ],
-        "finalQuery": true
-      },
-      {
-        "address": "223.5.5.5",
-        "domains": [
-          "geosite:cn",
+          "domain:home.arpa",
           "domain:connectivitycheck.gstatic.com",
           "domain:captive.apple.com",
           "domain:detectportal.firefox.com",
           "domain:msftconnecttest.com",
           "domain:msftncsi.com"
         ],
+        "finalQuery": true
+      },
+      {
+        "address": "https://1.1.1.1/dns-query",
+        "domains": [
+          "geosite:geolocation-!cn",
+          "geosite:google",
+          "geosite:openai",
+          "geosite:anthropic",
+          "domain:z.ai"
+        ]
+      },
+      {
+        "address": "223.5.5.5",
+        "domains": [
+          "geosite:cn"
+        ],
         "expectedIPs": [
           "geoip:cn"
         ]
       },
-      "8.8.8.8"
+      "https://1.1.1.1/dns-query"
     ],
     "queryStrategy": "UseIPv4"
   },
@@ -103,7 +113,9 @@
           "spiderX": "/"
         },
         "sockopt": {
-          "mark": 2
+          "mark": 2,
+          "tcpKeepAliveIdle": 15,
+          "tcpKeepAliveInterval": 5
         }
       }
     },
@@ -115,7 +127,9 @@
       },
       "streamSettings": {
         "sockopt": {
-          "mark": 2
+          "mark": 2,
+          "tcpKeepAliveIdle": 15,
+          "tcpKeepAliveInterval": 5
         }
       }
     },
@@ -158,6 +172,16 @@
       {
         "type": "field",
         "domain": [
+          "geosite:google",
+          "geosite:openai",
+          "geosite:anthropic",
+          "domain:z.ai"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "type": "field",
+        "domain": [
           "geosite:private",
           "geosite:cn",
           "domain:connectivitycheck.gstatic.com",
@@ -167,15 +191,6 @@
           "domain:msftncsi.com"
         ],
         "outboundTag": "direct"
-      },
-      {
-        "type": "field",
-        "domain": [
-          "geosite:google",
-          "geosite:openai",
-          "geosite:anthropic"
-        ],
-        "outboundTag": "proxy"
       },
       {
         "type": "field",

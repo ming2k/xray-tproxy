@@ -16,27 +16,25 @@ traffic).
 | routing table | `110` | Contains `local default dev lo` for mark-1 packets |
 | policy rule priority | `32765` | Set by the `systemd-networkd` drop-in |
 
-## Intercepted
+## Intercepted and Bypassed Rule Order
 
-Everything not listed under "Bypassed" is redirected to Xray (including System DNS port 53, Plain HTTP port 80, and Root process traffic):
+Rules evaluate top to bottom in both `prerouting` and `output` chains; first match applies:
 
-| Chain | Action |
-|-------|--------|
-| `prerouting` (v4/v6) | `tproxy to 127.0.0.1:12345` / `[::1]:12345`, set mark `1` |
-| `output` (v4/v6) | set mark `1`; policy routing delivers to loopback |
+1. **Mark-2 bypass** (`meta mark $BYPASS_MARK return`): Xray's own outbound connections must not loop.
+2. **ICMP bypass** (`ip protocol icmp return`, `icmpv6 type { ... } return`): Ping and neighbor discovery stay direct.
+3. **DNS interception** (`tcp/udp dport 53` -> TProxy / mark 1): Intercepted **before** IP range bypass so DNS queries to LAN gateways (e.g. `192.168.1.1:53`) do not bypass Xray and leak plaintext queries to GFW.
+4. **Reserved & LAN IP bypass** (`ip daddr $RESERVED_IP return`, `ip daddr 192.168.0.0/16 return`): Non-DNS traffic to router web interfaces, local NAS, and LAN services stays direct.
+5. **Remaining TCP/UDP interception** (`ip protocol tcp/udp` -> TProxy / mark 1): Redirected to Xray dokodemo-door for Smart Routing.
 
-## Bypassed (Kernel-Level)
+| Traffic | Action / Rule | Reason |
+|---------|---------------|--------|
+| Mark-2 packets | `meta mark $BYPASS_MARK return` | Xray outbounds |
+| ICMP / essential ICMPv6 | `ip protocol icmp return` | Native ping & discovery |
+| DNS (port 53) | Intercepted to Xray | Clean DNS via DoH / Smart Split |
+| Non-DNS Reserved & LAN (`10/8`, `192.168/16`, ...) | `return` | Local services direct |
+| All other TCP/UDP | Intercepted to Xray | Transparent proxy |
 
-Rules evaluate top to bottom; first match returns from the chain.
-
-| Traffic | Rule | Reason |
-|---------|------|--------|
-| Reserved ranges (`10/8`, `100.64/10`, `127/8`, `169.254/16`, `172.16/12`, ...; IPv6 ULA/link-local/multicast) | `ip daddr $RESERVED_IP return` (and v6 twin) | Local and non-routable destinations stay direct |
-| LAN (`192.168/16`, `fc00::/7`) | `ip daddr 192.168.0.0/16 return` (and v6 twin) | Local network services stay direct |
-| Mark-2 packets | `meta mark $BYPASS_MARK return` | Xray's own outbound connections must not loop |
-| ICMP / essential ICMPv6 | `ip protocol icmp return`, `icmpv6 type { ... } return` | Ping and neighbor discovery keep working |
-
-Note: Higher-level application traffic (DNS port 53, HTTP port 80, Root processes) is intercepted by nftables and classified by Xray's routing engine (`geosite:cn`, `geosite:captive-portal`, `geoip:private`, etc.).
+Note: Higher-level application traffic (DNS port 53, HTTP port 80, Root processes) is intercepted by nftables and classified by Xray's routing engine (`geosite:cn`, `geosite:private`, captive portal probes, `geoip:cn`, etc.).
 
 ## Live Inspection
 

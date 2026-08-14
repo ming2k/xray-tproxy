@@ -23,6 +23,7 @@ Entry point for the project documentation.
 | Page | Topic |
 |------|-------|
 | [Architecture](explanation/architecture.md) | Mechanism, component ownership, suspend/resume |
+| [Data Packet Lifecycle](explanation/packet-lifecycle.md) | Round-trip packet journey and 3-tier traffic steering model |
 | [DNS](explanation/dns.md) | System DNS vs. Xray DNS, and why port 53 stays direct |
 | [Captive Portals](explanation/captive-portals.md) | Why portals break under TProxy and how the design avoids it |
 

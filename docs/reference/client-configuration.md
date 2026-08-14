@@ -52,11 +52,13 @@ Usage examples: `git config --global http.proxy socks5h://127.0.0.1:1080`,
 |-----|----------|---------|
 | `proxy` | `vless` (REALITY, `xtls-rprx-vision`) | Remote server |
 | `direct` | `freedom` | Local/direct forwarding |
+| `dns-out` | `dns` | Xray internal DNS loopback |
 | `blocked` | `blackhole` | Drop |
 
 Every outbound sets `streamSettings.sockopt.mark: 2`, which matches
 `BYPASS_MARK` in the nftables rules so Xray's own connections are never
-re-intercepted.
+re-intercepted. Outbounds also configure `tcpKeepAliveIdle: 15` and `tcpKeepAliveInterval: 5`
+to quickly prune stale sockets after sleep/wake or network interface switches.
 
 ## Routing Rules
 
@@ -65,28 +67,26 @@ first match wins.
 
 | Order | Match | Outbound |
 |-------|-------|----------|
-| 1 | `ip: <SERVER_IP>` | `direct` — never proxy the proxy |
-| 2 | `protocol: bittorrent` | `direct` |
-| 3 | `ip: geoip:private` | `direct` |
-| 4 | `domain: geosite:private, geosite:cn` | `direct` |
-| 5 | `domain: geosite:google, geosite:openai, geosite:anthropic` | `proxy` |
-| 6 | `ip: geoip:cn` | `direct` |
-| 7 | `network: tcp,udp` (everything else) | `proxy` |
+| 1 | `inboundTag: all-in, socks-in, port: 53` | `dns-out` — Smart DNS resolution |
+| 2 | `ip: <SERVER_IP>` | `direct` — never proxy the proxy |
+| 3 | `protocol: bittorrent` | `direct` |
+| 4 | `ip: geoip:private` | `direct` |
+| 5 | `domain: geosite:google, geosite:openai, geosite:anthropic, domain:z.ai` | `proxy` — explicit proxy overrides before domestic list |
+| 6 | `domain: geosite:private, geosite:cn, captive portal probes` | `direct` |
+| 7 | `ip: geoip:cn` | `direct` |
+| 8 | `network: tcp,udp` (everything else) | `proxy` |
 
 ## Built-In DNS
 
-Xray uses its own `dns` module for its own resolution; applications never
-see it (see [DNS](../explanation/dns.md)).
+Xray uses its own `dns` module for Smart DNS resolution (see [DNS](../explanation/dns.md)).
 
-| Server | Used for | Verification |
-|--------|----------|--------------|
-| LAN gateway (`192.168.0.1`) | `geosite:private`, `domain:local`, `domain:lan`, `domain:home.arpa` | `finalQuery: true` |
-| `https://223.5.5.5/dns-query` (AliDNS over DoH) | `geosite:cn` | answers must match `geoip:cn` |
-| `https://223.5.5.5/dns-query` (AliDNS over DoH) | everything else | — |
+| Server | Used for | Verification / Notes |
+|--------|----------|----------------------|
+| `localhost` (system resolver / `127.0.0.53`) | `geosite:private`, `domain:local`, `domain:lan`, captive portal probes | `finalQuery: true` |
+| `https://1.1.1.1/dns-query` (Cloudflare DoH via `proxy`) | `geosite:geolocation-!cn`, `geosite:google`, `geosite:openai`, `geosite:anthropic`, `domain:z.ai` | Encrypted inside proxy tunnel; evaluated before `geosite:cn` to prevent overseas/hybrid AI domains from triggering `expectedIPs` drops |
+| `223.5.5.5` (AliDNS) | `geosite:cn` | answers must match `geoip:cn` |
+| `https://1.1.1.1/dns-query` (Cloudflare DoH via `proxy`) | Default fallback | Encrypted inside proxy tunnel |
 
-Proxied domains are not resolved locally: `sniffing.destOverride` dials
-them by name and the server resolves them at its end. Local resolution
-only feeds routing classification and `direct` dialing, so a domestic
-resolver is sufficient and avoids plaintext foreign DNS queries.
+`localhost` automatically queries whatever upstream DNS is assigned by DHCP to the current Wi-Fi/Ethernet link, enabling captive portal login detection on any network without manual reconfiguration.
 
-`dns.queryStrategy` is `UseSystem`: address family follows the system.
+`dns.queryStrategy` is `UseIPv4`: prioritizes IPv4 resolution.

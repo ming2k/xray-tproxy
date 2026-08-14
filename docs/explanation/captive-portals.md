@@ -34,9 +34,10 @@ pre-auth.
 
 ## How This Setup Avoids The Conflict
 
-Instead of unencrypted global bypasses in nftables, traffic interception and captive portal compatibility are handled via Xray's routing engine:
+Instead of unencrypted global bypasses in nftables, traffic interception and captive portal compatibility are handled via Xray's DNS and routing engine:
 
-- **Probe Domain Direct Routing**: Xray routes `geosite:captive-portal` (such as Apple's `hotspot-detect`, Android's `generate_204`, and Firefox's `detectportal.firefox.com`) and `geosite:private` / `geoip:private` to the **`direct`** outbound.
+- **Dynamic Local Resolver for Probes**: Xray's DNS config maps portal probe domains (`captive.apple.com`, `connectivitycheck.gstatic.com`, `detectportal.firefox.com`, `msftconnecttest.com`, `msftncsi.com`) to `localhost`. This queries `systemd-resolved`, which dynamically forwards queries to whatever DHCP DNS server was assigned by the current Wi-Fi network. In a walled garden, the local gateway immediately spoof-resolves the probe to the portal login IP.
+- **Probe Domain Direct Routing**: Xray routes probe domains and `geosite:private` / `geoip:private` to the **`direct`** outbound.
 - **Unauthenticated Flow**: Before Wi-Fi login, remote proxy servers are unreachable. When OS probes initiate HTTP requests, Xray routes them via `direct` out the local wireless interface. The Wi-Fi gateway sees the naked HTTP probe, hijacks it with a `302 Redirect`, and opens the portal login page.
 - **Authenticated Protection**: Once logged in, regular HTTP (port 80) and HTTPS (port 443) traffic to overseas destinations travel securely through the proxy tunnel, preventing ISP HTTP hijacking and allowing access to blocked HTTP sites.
 

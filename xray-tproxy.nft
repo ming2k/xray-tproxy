@@ -31,19 +31,24 @@ table ip xray_v4 {
   chain prerouting {
     type filter hook prerouting priority mangle; policy accept;
 
-    # Skip reserved IP ranges
-    ip daddr $RESERVED_IP return
-
-    # LAN destinations stay direct
-    ip daddr 192.168.0.0/16 return
-
     # Skip packets already marked for bypass (e.g. Xray outbounds)
     meta mark $BYPASS_MARK return
 
     # Bypass ICMP (ping, traceroute ICMP mode, etc.)
     ip protocol icmp return
 
-    # Redirect all TCP/UDP traffic to Xray TProxy
+    # Redirect all DNS traffic to Xray TProxy before IP filtering
+    # (prevents LAN/gateway bypass from leaking unencrypted DNS to GFW)
+    tcp dport 53 tproxy to 127.0.0.1:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
+    udp dport 53 tproxy to 127.0.0.1:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
+
+    # Skip reserved IP ranges
+    ip daddr $RESERVED_IP return
+
+    # LAN destinations stay direct
+    ip daddr 192.168.0.0/16 return
+
+    # Redirect all remaining TCP/UDP traffic to Xray TProxy
     ip protocol tcp tproxy to 127.0.0.1:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
     ip protocol udp tproxy to 127.0.0.1:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
   }
@@ -51,19 +56,23 @@ table ip xray_v4 {
   chain output {
     type route hook output priority mangle; policy accept;
 
-    # Skip reserved IP ranges
-    ip daddr $RESERVED_IP return
-
-    # LAN destinations stay direct
-    ip daddr 192.168.0.0/16 return
-
     # Skip packets already marked for bypass (e.g. Xray outbounds)
     meta mark $BYPASS_MARK return
 
     # Bypass ICMP from local machine
     ip protocol icmp return
 
-    # Mark TCP/UDP packets for routing through Xray
+    # Mark all DNS packets from local machine for Xray Smart DNS
+    tcp dport 53 meta mark set $XRAY_MARK counter
+    udp dport 53 meta mark set $XRAY_MARK counter
+
+    # Skip reserved IP ranges
+    ip daddr $RESERVED_IP return
+
+    # LAN destinations stay direct
+    ip daddr 192.168.0.0/16 return
+
+    # Mark remaining TCP/UDP packets for routing through Xray
     ip protocol tcp meta mark set $XRAY_MARK counter
     ip protocol udp meta mark set $XRAY_MARK counter
   }
@@ -73,12 +82,6 @@ table ip xray_v4 {
 table ip6 xray_v6 {
   chain prerouting {
     type filter hook prerouting priority mangle; policy accept;
-
-    # Skip reserved IPv6 ranges
-    ip6 daddr $RESERVED_IP6 return
-
-    # LAN destinations stay direct
-    ip6 daddr fc00::/7 return
 
     # Skip packets already marked for bypass (e.g. Xray outbounds)
     meta mark $BYPASS_MARK return
@@ -97,19 +100,23 @@ table ip6 xray_v6 {
       nd-neighbor-advert
     } return
 
-    # Redirect all TCP/UDP traffic to Xray TProxy
-    ip6 nexthdr tcp tproxy to [::1]:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
-    ip6 nexthdr udp tproxy to [::1]:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
-  }
-
-  chain output {
-    type route hook output priority mangle; policy accept;
+    # Redirect all DNS traffic to Xray TProxy before IP filtering
+    tcp dport 53 tproxy to [::1]:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
+    udp dport 53 tproxy to [::1]:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
 
     # Skip reserved IPv6 ranges
     ip6 daddr $RESERVED_IP6 return
 
     # LAN destinations stay direct
     ip6 daddr fc00::/7 return
+
+    # Redirect all remaining TCP/UDP traffic to Xray TProxy
+    ip6 nexthdr tcp tproxy to [::1]:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
+    ip6 nexthdr udp tproxy to [::1]:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
+  }
+
+  chain output {
+    type route hook output priority mangle; policy accept;
 
     # Skip packets already marked for bypass (e.g. Xray outbounds)
     meta mark $BYPASS_MARK return
@@ -128,7 +135,17 @@ table ip6 xray_v6 {
       nd-neighbor-advert
     } return
 
-    # Mark TCP/UDP packets for routing through Xray
+    # Mark all DNS packets from local machine for Xray Smart DNS
+    tcp dport 53 meta mark set $XRAY_MARK counter
+    udp dport 53 meta mark set $XRAY_MARK counter
+
+    # Skip reserved IPv6 ranges
+    ip6 daddr $RESERVED_IP6 return
+
+    # LAN destinations stay direct
+    ip6 daddr fc00::/7 return
+
+    # Mark remaining TCP/UDP packets for routing through Xray
     ip6 nexthdr tcp meta mark set $XRAY_MARK counter
     ip6 nexthdr udp meta mark set $XRAY_MARK counter
   }
