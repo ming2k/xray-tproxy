@@ -22,14 +22,17 @@ Rules evaluate top to bottom in both `prerouting` and `output` chains; first mat
 
 1. **Mark-2 bypass** (`meta mark $BYPASS_MARK return`): Xray's own outbound connections must not loop.
 2. **ICMP bypass** (`ip protocol icmp return`, `icmpv6 type { ... } return`): Ping and neighbor discovery stay direct.
-3. **DNS interception** (`tcp/udp dport 53` -> TProxy / mark 1): Intercepted **before** IP range bypass so DNS queries to LAN gateways (e.g. `192.168.1.1:53`) do not bypass Xray and leak plaintext queries to GFW.
-4. **Reserved & LAN IP bypass** (`ip daddr $RESERVED_IP return`, `ip daddr 192.168.0.0/16 return`): Non-DNS traffic to router web interfaces, local NAS, and LAN services stays direct.
-5. **Remaining TCP/UDP interception** (`ip protocol tcp/udp` -> TProxy / mark 1): Redirected to Xray dokodemo-door for Smart Routing.
+3. **DNS loop exemption** (`meta skuid "xray"/"systemd-resolve" dport 53 ... meta mark 0 return` in `output`; `ip daddr 127.0.0.53 dport 53 meta mark 0 return` in IPv4 `prerouting`): Xray's `localhost` queries and resolved's upstream forwards leave unmarked and reach their real destinations. Without this pair the localhost DNS path re-intercepts itself and starves.
+4. **DNS interception** (`tcp/udp dport 53` -> TProxy / mark 1): Intercepted **before** IP range bypass so DNS queries to LAN gateways (e.g. `192.168.1.1:53`) do not bypass Xray and leak plaintext queries to GFW.
+5. **Reserved & LAN IP bypass** (`ip daddr $RESERVED_IP return`, `ip daddr 192.168.0.0/16 return`): Non-DNS traffic to router web interfaces, local NAS, and LAN services stays direct.
+6. **Remaining TCP/UDP interception** (`ip protocol tcp/udp` -> TProxy / mark 1): Redirected to Xray dokodemo-door for Smart Routing.
 
 | Traffic | Action / Rule | Reason |
 |---------|---------------|--------|
 | Mark-2 packets | `meta mark $BYPASS_MARK return` | Xray outbounds |
 | ICMP / essential ICMPv6 | `ip protocol icmp return` | Native ping & discovery |
+| DNS from `xray` / `systemd-resolve` users (mark 0) | `meta skuid ... return` | Break the localhost/forward loop |
+| Unmarked port-53 to `127.0.0.53` | `ip daddr 127.0.0.53 ... return` (prerouting) | Deliver Xray's `localhost` queries to the stub |
 | DNS (port 53) | Intercepted to Xray | Clean DNS via DoH / Smart Split |
 | Non-DNS Reserved & LAN (`10/8`, `192.168/16`, ...) | `return` | Local services direct |
 | All other TCP/UDP | Intercepted to Xray | Transparent proxy |

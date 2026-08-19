@@ -21,7 +21,7 @@
           "domain:msftconnecttest.com",
           "domain:msftncsi.com"
         ],
-        "finalQuery": true
+        "skipFallback": true
       },
       {
         "address": "https://1.1.1.1/dns-query",

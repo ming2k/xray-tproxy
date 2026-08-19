@@ -13,6 +13,8 @@ Match your symptom and apply the fix.
 
 | `geoip:cn` / `geosite:cn` rules never match | `geoip.dat` / `geosite.dat` not found | install the `geo-assets.conf` drop-in; see [Install the nftables Rules and the Service Unit](install-and-start.md#install-the-nftables-rules-and-the-service-unit) |
 | A domain in `geosite:cn` fails DNS (e.g. `api.z.ai`) | Domain resolves to non-mainland IP dropped by `expectedIPs: ["geoip:cn"]` | Add the domain (`domain:z.ai`) to DoH `dns.servers` before `geosite:cn` and proxy `routing.rules`; see [DNS](../explanation/dns.md) |
+| Only unlisted/new domains fail DNS (e.g. `edge.prelude.dev`), geosite domains fine | `localhost` DNS server has `finalQuery: true`, truncating the fallback list | replace with `skipFallback: true`; see [DNS](../explanation/dns.md#the-dns-loop-hazard) |
+| Portal probes (`captive.apple.com` etc.) time out; `resolvectl query` works but `getent` hangs | localhost DNS path re-intercepted: missing nft exemption for `xray`/`systemd-resolve` users | reinstall `xray-tproxy.nft` and restart the service; see [DNS](../explanation/dns.md#the-dns-loop-hazard) |
 | Public Wi-Fi login page never opens | portal login page hosted on public HTTPS | see [How to Use Captive Portal Networks](use-captive-portal-networks.md) |
 | Slow DNS right after joining a hotspot | walled garden blocks resolution pre-auth | expected; resolves itself after portal login |
 | Blocked sites unreachable on a trusted network | DoH server unreachable or routing rule mismatch | check `journalctl -u xray-tproxy` and verify `dns-out` tag; see [DNS](../explanation/dns.md) |

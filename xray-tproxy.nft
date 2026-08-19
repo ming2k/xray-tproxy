@@ -37,6 +37,15 @@ table ip xray_v4 {
     # Bypass ICMP (ping, traceroute ICMP mode, etc.)
     ip protocol icmp return
 
+    # Unmarked port-53 packets to the resolver stub (127.0.0.53) are
+    # Xray's own `localhost` DNS queries, exempted in the output chain.
+    # Deliver them to systemd-resolved; marked application queries to the
+    # stub still fall through to the interception rules below. Without
+    # this exemption Xray would re-intercept its own query on the
+    # loopback path and spin in a loop, starving the localhost DNS path.
+    ip daddr 127.0.0.53 udp dport 53 meta mark 0 counter return
+    ip daddr 127.0.0.53 tcp dport 53 meta mark 0 counter return
+
     # Redirect all DNS traffic to Xray TProxy before IP filtering
     # (prevents LAN/gateway bypass from leaking unencrypted DNS to GFW)
     tcp dport 53 tproxy to 127.0.0.1:$XRAY_TPROXY_PORT meta mark set $XRAY_MARK counter
@@ -61,6 +70,22 @@ table ip xray_v4 {
 
     # Bypass ICMP from local machine
     ip protocol icmp return
+
+    # Exempt the DNS sockets of the Xray user and systemd-resolved from
+    # DNS interception, or the localhost DNS path loops forever:
+    #  - Xray's `localhost` DNS server dials 127.0.0.53 as an ordinary
+    #    process, so without an exemption its query is re-intercepted by
+    #    the port-53 rule below and handed back to Xray itself.
+    #  - systemd-resolved forwards to the DHCP-assigned upstream; that
+    #    forward is also port 53 and would be re-intercepted the same way.
+    # Keyed on `meta mark 0` so packets already carrying fwmark 1 (an
+    # intercepted application query) keep flowing to Xray. Application
+    # queries are never exempted: they run as other users. Both user
+    # accounts must exist (see the unit's User= and README quick start).
+    meta skuid "xray" udp dport 53 meta mark 0 counter return
+    meta skuid "xray" tcp dport 53 meta mark 0 counter return
+    meta skuid "systemd-resolve" udp dport 53 meta mark 0 counter return
+    meta skuid "systemd-resolve" tcp dport 53 meta mark 0 counter return
 
     # Mark all DNS packets from local machine for Xray Smart DNS
     tcp dport 53 meta mark set $XRAY_MARK counter
@@ -134,6 +159,18 @@ table ip6 xray_v6 {
       nd-neighbor-solicit,
       nd-neighbor-advert
     } return
+
+    # Exempt the DNS sockets of the Xray user and systemd-resolved from
+    # DNS interception, or the localhost DNS path loops forever (see the
+    # ip xray_v4 output chain for the full rationale). IPv6 carries no
+    # 127.0.0.53 equivalent here: the systemd-resolved stub listens on
+    # IPv4 loopback only, so only the per-user exemptions apply.
+    # Keyed on `meta mark 0` so packets already carrying fwmark 1 (an
+    # intercepted application query) keep flowing to Xray.
+    meta skuid "xray" udp dport 53 meta mark 0 counter return
+    meta skuid "xray" tcp dport 53 meta mark 0 counter return
+    meta skuid "systemd-resolve" udp dport 53 meta mark 0 counter return
+    meta skuid "systemd-resolve" tcp dport 53 meta mark 0 counter return
 
     # Mark all DNS packets from local machine for Xray Smart DNS
     tcp dport 53 meta mark set $XRAY_MARK counter

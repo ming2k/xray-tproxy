@@ -82,8 +82,8 @@ Xray uses its own `dns` module for Smart DNS resolution (see [DNS](../explanatio
 
 | Server | Used for | Verification / Notes |
 |--------|----------|----------------------|
-| `localhost` (system resolver / `127.0.0.53`) | `geosite:private`, `domain:local`, `domain:lan`, captive portal probes | `finalQuery: true` |
-| `https://1.1.1.1/dns-query` (Cloudflare DoH via `proxy`) | `geosite:geolocation-!cn`, `geosite:google`, `geosite:openai`, `geosite:anthropic`, `domain:z.ai` | Encrypted inside proxy tunnel; evaluated before `geosite:cn` to prevent overseas/hybrid AI domains from triggering `expectedIPs` drops |
+| `localhost` (system resolver / `127.0.0.53`) | `geosite:private`, `domain:local`, `domain:lan`, captive portal probes | `skipFallback: true` — pinned to its domains, never joins the fallback chain. Do not use `finalQuery: true` here: it truncates the fallback list at position 0 and kills resolution for every domain not present in the geosite lists |
+| `https://1.1.1.1/dns-query` (Cloudflare DoH via `proxy`) | `geosite:geolocation-!cn`, `geosite:google`, `geosite:openai`, `geosite:anthropic`, `geosite:github`, `domain:z.ai` | Encrypted inside proxy tunnel; must be listed before `223.5.5.5`, and evaluated before `geosite:cn` to prevent overseas/hybrid AI domains from triggering `expectedIPs` drops |
 | `223.5.5.5` (AliDNS) | `geosite:cn` | answers must match `geoip:cn` |
 | `https://1.1.1.1/dns-query` (Cloudflare DoH via `proxy`) | Default fallback | Encrypted inside proxy tunnel |
 

@@ -31,6 +31,7 @@ The counters on the `tproxy` / `meta mark set` rules should grow.
 curl -s https://api.ipify.org    # expect: your server's IP (proxied)
 curl -s http://api.ipify.org     # expect: your server's IP (proxied; port 80 is protected)
 dig +short google.com            # expect: authentic overseas IP (Real-IP via DoH)
+dig +short edge.prelude.dev      # expect: answers — any domain outside the geosite lists must still resolve via the DoH fallback
 ```
 
 Both HTTP (port 80) and HTTPS (port 443) for overseas destinations travel through the proxy tunnel. Domain resolution uses Real-IP via DoH without FakeIP subnet anomalies. See

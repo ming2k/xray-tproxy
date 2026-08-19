@@ -40,9 +40,10 @@ Instead of brute-force global gateway hijacking or heavy virtual TUN interfaces,
 The `prerouting` and `output` chains enforce strict constraint ordering:
 1. **Self-Loop Bypass (`meta mark 2 return`)**: Any packet originating from Xray outbounds carries `mark 2` and immediately exits the chain.
 2. **ICMP Bypass (`ip protocol icmp return`)**: Native ping, traceroute, and path MTU discovery stay direct and low-latency.
-3. **DNS Priority Interception (`dport 53 -> mark 1`)**: Evaluated **before** private IP bypasses. This prevents LAN gateways (e.g. `192.168.1.1:53`) from receiving unencrypted DNS queries for blocked overseas domains.
-4. **LAN / Reserved IP Bypass (`ip daddr $RESERVED_IP return`)**: Non-DNS traffic to router admin portals, local NAS, SSH servers, and LAN devices stays 100% direct.
-5. **Intercept Candidate Marking (`ip protocol tcp/udp -> mark 1`)**: All remaining outbound traffic is tagged with `fwmark 1`.
+3. **DNS Loop Exemption (`meta skuid ... dport 53 meta mark 0 return`; IPv4 prerouting `ip daddr 127.0.0.53 dport 53 meta mark 0 return`)**: Keeps the `localhost` DNS path alive — Xray's own stub queries and systemd-resolved's upstream forwards leave unmarked instead of being re-intercepted. Evaluated before the port-53 interception rules (see [DNS](dns.md#the-dns-loop-hazard)).
+4. **DNS Priority Interception (`dport 53 -> mark 1`)**: Evaluated **before** private IP bypasses. This prevents LAN gateways (e.g. `192.168.1.1:53`) from receiving unencrypted DNS queries for blocked overseas domains.
+5. **LAN / Reserved IP Bypass (`ip daddr $RESERVED_IP return`)**: Non-DNS traffic to router admin portals, local NAS, SSH servers, and LAN devices stays 100% direct.
+6. **Intercept Candidate Marking (`ip protocol tcp/udp -> mark 1`)**: All remaining outbound traffic is tagged with `fwmark 1`.
 
 ### Layer 2: Kernel Policy Routing Constraints (`xray-policy.conf`)
 * **Priority 32765 (`fwmark 1 lookup 110`)**: Sits just above `Table main` (32766) and below `Table local` (0).
@@ -51,9 +52,9 @@ The `prerouting` and `output` chains enforce strict constraint ordering:
 ### Layer 3: Application-Level Classification (`/etc/xray/config.json`)
 * **Sniffing Engine (`routeOnly: true`)**: Inspects initial handshakes to extract real domain names even when apps connect via raw IP addresses.
 * **Three-Tier Smart DNS**:
-  - `geosite:private`, `geosite:captive-portal`, `domain:local` -> `localhost` (system resolver / DHCP DNS).
+  - `geosite:private`, `geosite:captive-portal`, `domain:local` -> `localhost` (system resolver / DHCP DNS), pinned via `skipFallback: true`.
   - `geosite:cn` -> `223.5.5.5` (Domestic fast Anycast).
-  - Overseas / Blocked domains -> `https://1.1.1.1/dns-query` (Encrypted DoH via proxy tunnel).
+  - Overseas / Blocked domains -> `https://1.1.1.1/dns-query` (Encrypted DoH via proxy tunnel); unlisted domains fall back to the same DoH.
 * **Outbound Socket Marking (`sockopt.mark: 2`)**: Guarantees Layer 1 bypass for all outbound traffic.
 
 ---
